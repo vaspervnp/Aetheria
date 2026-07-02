@@ -42,8 +42,8 @@ public static class GameConfig
     public const float WallClimbSpeed = 92f;      // upward climb with ability
 
     // ---- Dash ---------------------------------------------------------------
-    public const float DashSpeed = 470f;
-    public const float DashTime = 0.16f;
+    public const float DashSpeed = 500f;
+    public const float DashTime = 0.18f;
     public const float DashCooldown = 0.45f;
 
     // ---- Combat / survivability --------------------------------------------

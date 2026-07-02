@@ -72,17 +72,17 @@ public static class WorldBuilder
         b.Spawn(3, 22);
         b.Platform(7, 10, 19);
         b.Pickup(8, 19, AbilityType.Dash);
-        b.Pit(30, 39, 3);                   // 10-wide chasm with a hazard floor
-        b.Block(31, 16, 39, 17);            // low ceiling: no big jump arc over the gap
+        b.Pit(30, 37, 3);                   // 8-wide chasm with a hazard floor
+        b.Block(31, 16, 36, 17);            // low ceiling: no big jump arc over the gap
         b.EastDoor(19, 3);
         b.Enemy(20, 21, EnemyKind.Crawler, 5);
         b.Enemy(45, 21, EnemyKind.Crawler, 5);
-        b.Enemy(35, 11, EnemyKind.Floater, 4);
+        b.Enemy(34, 11, EnemyKind.Floater, 4);
         // critical path
         b.Waypoint(8, 19);
         b.Waypoint(8, 22);
         b.Walk(29, 22);                     // west lip of the chasm
-        b.Waypoint(40, 22, AbilityType.Dash); // dash across (11 tiles)
+        b.Waypoint(38, 22, AbilityType.Dash); // dash across (9 tiles)
         b.Walk(50, 22);
         return b.Build();
     }
