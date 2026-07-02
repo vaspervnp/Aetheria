@@ -31,6 +31,8 @@ public sealed class Enemy : Entity
     private bool _grounded;
     private int _mode;          // charger state: 0 patrol, 1 windup, 2 charge, 3 recover
     private float _modeTimer;
+    private float _repathTimer;
+    private GridPoint? _pathNext;
 
     private readonly float _speed;
 
@@ -48,6 +50,9 @@ public sealed class Enemy : Entity
             EnemyKind.Sentinel => (6, 34f),
             EnemyKind.Charger => (3, 60f),
             EnemyKind.Warden => (22, 30f),
+            EnemyKind.HoverTurret => (3, 22f),
+            EnemyKind.StalkerDrone => (2, 152f),
+            EnemyKind.ArmoredCrawler => (4, 42f),
             _ => (2, 50f),
         };
         Health = MaxHealth;
@@ -62,6 +67,9 @@ public sealed class Enemy : Entity
         EnemyKind.Sentinel => new Vector2(20, 20),
         EnemyKind.Charger => new Vector2(16, 14),
         EnemyKind.Warden => new Vector2(30, 30),
+        EnemyKind.HoverTurret => new Vector2(18, 16),
+        EnemyKind.StalkerDrone => new Vector2(14, 14),
+        EnemyKind.ArmoredCrawler => new Vector2(18, 14),
         _ => new Vector2(14, 14),
     };
 
@@ -70,6 +78,10 @@ public sealed class Enemy : Entity
     public bool WindingUp => Kind == EnemyKind.Charger && _mode == 1;
     public bool Enraged => Kind == EnemyKind.Warden && Health * 2 <= MaxHealth;
     public float HealthFraction => MaxHealth <= 0 ? 0f : Health / (float)MaxHealth;
+
+    /// <summary>Armored Crawlers ignore attacks that land on their facing (front) side.</summary>
+    public bool ArmoredFront => Kind == EnemyKind.ArmoredCrawler;
+    public bool IsFrontalHit(float attackerX) => Math.Sign(attackerX - Center.X) == Facing;
 
     public static Enemy FromSpawn(EnemySpawn spawn, int tileSize)
         => new(spawn.Kind, spawn.WorldCenter(tileSize), spawn.Range * tileSize);
@@ -100,7 +112,66 @@ public sealed class Enemy : Entity
             case EnemyKind.Sentinel: UpdateSentinel(map, player, dt, projectiles); break;
             case EnemyKind.Charger: UpdateCharger(map, player, dt); break;
             case EnemyKind.Warden: UpdateWarden(map, player, dt, projectiles); break;
+            case EnemyKind.ArmoredCrawler: UpdateCrawler(map, dt); break;
+            case EnemyKind.HoverTurret: UpdateHoverTurret(map, player, dt, projectiles); break;
+            case EnemyKind.StalkerDrone: UpdateStalkerDrone(map, player, dt); break;
         }
+    }
+
+    private void UpdateHoverTurret(TileMap map, Player player, float dt, List<Projectile> projectiles)
+    {
+        // hovers in place with a gentle bob, aims where the player is heading
+        float ny = Home.Y + MathF.Sin(_t * 1.6f) * 6f;
+        Position = new Vector2(Home.X - Width * 0.5f, ny - Height * 0.5f);
+        Facing = player.Center.X >= Center.X ? 1 : -1;
+
+        _fireTimer -= dt;
+        float dist = Vector2.Distance(Center, player.Center);
+        if (_fireTimer <= 0f && dist < 320f && player.Alive && LineOfSight(map, Center, player.Center))
+        {
+            _fireTimer = 1.5f;
+            const float projSpeed = 155f;
+            float lead = dist / projSpeed;                       // predictive aim
+            Vector2 aim = player.Center + player.Velocity * lead;
+            Vector2 dir = aim - Center;
+            dir = dir.LengthSquared() < 0.01f ? new Vector2(Facing, 0f) : Vector2.Normalize(dir);
+            projectiles.Add(new Projectile(Center, dir * projSpeed, 3.5f, 3f, 1, fromPlayer: false));
+        }
+    }
+
+    private void UpdateStalkerDrone(TileMap map, Player player, float dt)
+    {
+        _repathTimer -= dt;
+        var myTile = new GridPoint(map.WorldToTileX(Center.X), map.WorldToTileY(Center.Y));
+        var goal = new GridPoint(map.WorldToTileX(player.Center.X), map.WorldToTileY(player.Center.Y));
+        if (_repathTimer <= 0f)
+        {
+            _pathNext = Pathfinder.NextStep(map, myTile, goal);
+            _repathTimer = 0.1f;
+        }
+
+        Vector2 aim = _pathNext is { } n
+            ? new Vector2((n.X + 0.5f) * map.TileSize, (n.Y + 0.5f) * map.TileSize)
+            : player.Center;
+        Vector2 dir = aim - Center;
+        dir = dir.LengthSquared() < 1f ? Vector2.Zero : Vector2.Normalize(dir);
+        Velocity = dir * _speed;
+        Facing = Velocity.X >= 0 ? 1 : -1;
+
+        TileCollider.MoveX(map, ref Position, ref Velocity, Width, Height, Velocity.X * dt);
+        TileCollider.MoveY(map, ref Position, ref Velocity, Width, Height, Velocity.Y * dt);
+    }
+
+    private static bool LineOfSight(TileMap map, Vector2 a, Vector2 b)
+    {
+        float dist = Vector2.Distance(a, b);
+        int steps = Math.Max(1, (int)(dist / (map.TileSize * 0.5f)));
+        for (int i = 1; i < steps; i++)
+        {
+            Vector2 p = Vector2.Lerp(a, b, i / (float)steps);
+            if (map.IsSolidTile(map.WorldToTileX(p.X), map.WorldToTileY(p.Y))) return false;
+        }
+        return true;
     }
 
     private void UpdateCharger(TileMap map, Player player, float dt)

@@ -41,6 +41,7 @@ public static class CombatSystem
             foreach (var e in enemies)
             {
                 if (!e.AliveState || !blade.Intersects(e.Bounds)) continue;
+                if (e.ArmoredFront && e.IsFrontalHit(player.Center.X)) { effect?.Invoke(EffectKind.EnemyHit, e.Center); continue; }
                 var kb = new Vector2(player.Facing * 170f, -70f);
                 if (e.TakeDamage(GameConfig.BladeDamage, kb))
                     effect?.Invoke(e.AliveState ? EffectKind.EnemyHit : EffectKind.EnemyDead, e.Center);
@@ -63,6 +64,12 @@ public static class CombatSystem
             foreach (var e in enemies)
             {
                 if (!e.AliveState || !proj.Bounds.Intersects(e.Bounds)) continue;
+                if (e.ArmoredFront && e.IsFrontalHit(proj.Position.X))
+                {
+                    effect?.Invoke(EffectKind.EnemyHit, e.Center);   // deflected off the armour
+                    proj.Dead = true;
+                    break;
+                }
                 var kb = new Vector2(MathF.Sign(proj.Velocity.X) * 90f, -40f);
                 if (e.TakeDamage(proj.Damage, kb))
                     effect?.Invoke(e.AliveState ? EffectKind.EnemyHit : EffectKind.EnemyDead, e.Center);
@@ -77,6 +84,7 @@ public static class CombatSystem
             foreach (var e in enemies)
             {
                 if (!e.AliveState || !player.Bounds.Intersects(e.Bounds)) continue;
+                if (e.ArmoredFront && e.IsFrontalHit(player.Center.X)) continue;
                 var kb = new Vector2(player.Facing * 140f, -60f);
                 if (e.TakeDamage(GameConfig.DashDamage, kb))
                     effect?.Invoke(e.AliveState ? EffectKind.EnemyHit : EffectKind.EnemyDead, e.Center);

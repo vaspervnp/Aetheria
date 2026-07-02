@@ -122,6 +122,6 @@ and advanced enemies. Build iteratively, test + commit each subsystem.
 - [x] Procedural SFX per weapon; tests for weapon logic
 
 ## P2.6 — Advanced enemies
-- [ ] Hover-Turret (predictive aim), Stalker-Drone (pathfinding chase),
+- [x] Hover-Turret (predictive aim), Stalker-Drone (pathfinding chase),
       Armored Crawler (frontal-immune)
-- [ ] Tests for each behaviour
+- [x] Tests for each behaviour

@@ -652,6 +652,28 @@ public sealed class Game : IDisposable
                 case EnemyKind.Warden:
                     DrawWarden(e, c);
                     break;
+                case EnemyKind.HoverTurret:
+                    Raylib.BeginBlendMode(BlendMode.Additive);
+                    Raylib.DrawCircleV(c, 14f, Raylib.Fade(Palette.Sentinel, 0.28f));
+                    Raylib.EndBlendMode();
+                    Raylib.DrawRectangleRounded(new Rectangle(e.Position.X, e.Position.Y, e.Width, e.Height), 0.3f, 5, Palette.Rgb(150, 120, 90));
+                    Raylib.DrawRectangle((int)(c.X + e.Facing * 4), (int)c.Y - 2, 8 * e.Facing, 4, Palette.Rgb(60, 50, 40)); // barrel
+                    Raylib.DrawCircleV(c, 3f, Palette.Hazard);
+                    break;
+                case EnemyKind.StalkerDrone:
+                    Raylib.BeginBlendMode(BlendMode.Additive);
+                    Raylib.DrawCircleV(c, 12f, Raylib.Fade(Palette.Hazard, 0.3f));
+                    Raylib.EndBlendMode();
+                    Raylib.DrawPoly(c, 3, e.Width * 0.6f, _time * 200f, Palette.Rgb(230, 90, 110));
+                    Raylib.DrawCircleV(c, 2.5f, Palette.EnemyEye);
+                    break;
+                case EnemyKind.ArmoredCrawler:
+                    Raylib.DrawRectangleRounded(new Rectangle(e.Position.X, e.Position.Y, e.Width, e.Height), 0.25f, 5, Palette.Rgb(110, 116, 130));
+                    // front armour plate (on the facing side)
+                    float axp = e.Facing > 0 ? e.Bounds.Right - 3 : e.Bounds.Left;
+                    Raylib.DrawRectangle((int)axp, (int)e.Position.Y, 3, (int)e.Height, Palette.Rgb(180, 190, 210));
+                    Raylib.DrawCircleV(new Vector2(c.X - e.Facing * 3, c.Y - 1), 2f, Palette.EnemyEye);
+                    break;
             }
         }
     }
