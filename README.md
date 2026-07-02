@@ -10,6 +10,15 @@ abandoned bio-mechanical planetary engine. Navigate the interconnected zones of
 the Abyss, reclaim lost traversal abilities, silence the corrupted guardian
 algorithms, and reach the Core to reignite the planet.
 
+> **Phase 2 — massive-scale Metroidvania.** The world is now a **procedurally
+> generated grid of 60+ screens** across **three biomes** (the Rust Vents, the
+> Crystal Conduits, the Mainframe), connected N/S/E/W and gated by abilities,
+> **locked doors and puzzles** (shootable/melee switches, pressure plates with
+> pushable heavy blocks, timed sequence puzzles). Spark wields an **arsenal**
+> (Blaster / Scatter-Shot / Plasma Blade) and faces **advanced enemies**
+> (predictive-aim Hover-Turrets, pathfinding Stalker-Drones, frontal-immune
+> Armored Crawlers). See `TODO.md` for the full Phase 2 breakdown.
+
 ---
 
 ## Features
@@ -85,6 +94,8 @@ dotnet run --project src/Aetheria -- --smoke   # head-less simulation self-test
 | Action                    | Keys                    |
 |---------------------------|-------------------------|
 | Move                      | `A` / `D` or `←` / `→`  |
+| Fire weapon               | `J` / `X`               |
+| Switch weapon             | `Q` / `E`               |
 | Jump / Double Jump        | `Space` / `Z`           |
 | Up / Wall-climb (hold)    | `W` / `↑` (into a wall) |
 | Down / drop through       | `S` / `↓`               |
