@@ -28,12 +28,12 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [x] xUnit: jump apex, gravity fall, landing, dash displacement, gating
 
 ## Milestone 3 — World & rooms
-- [ ] `Room` (tilemap + spawns + doors + pickups + metadata)
-- [ ] `RoomGenerator` — deterministic, guaranteed-traversable layouts, organic
+- [x] `Room` (tilemap + spawns + doors + pickups + metadata)
+- [x] `RoomGenerator` — deterministic, guaranteed-traversable layouts, organic
       cellular-automata decoration + noise texturing hints
-- [ ] `World` graph — current room, edge-door transitions, respawn
-- [ ] Ability-gated progression path to the Core
-- [ ] xUnit: generator invariants (bounds, spawn not in solid, has floor),
+- [x] `World` graph — current room, edge-door transitions, respawn
+- [x] Ability-gated progression path to the Core
+- [x] xUnit: generator invariants (bounds, spawn not in solid, has floor),
       world transition wiring, reachability of the Core
 
 ## Milestone 4 — Enemies & combat
