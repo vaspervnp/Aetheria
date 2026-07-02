@@ -9,14 +9,14 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [x] README + TODO plan
 
 ## Milestone 1 — Testable core (no rendering)
-- [ ] Deterministic RNG (`Rng`) — xorshift, reproducible for tests
-- [ ] Value/Perlin noise (`Noise`) — seeded, bounded output
-- [ ] `Aabb` axis-aligned box + intersection / sweep helpers
-- [ ] `GameConfig` tunables (gravity, speeds, tile size…)
-- [ ] Input abstraction (`IInputSource`, `InputState`, scripted source)
-- [ ] `TileType` + `TileMap` (grid, solidity, world↔tile, collision queries)
-- [ ] `AbilitySet` progression / inventory
-- [ ] xUnit: RNG, noise bounds, AABB, tilemap, abilities
+- [x] Deterministic RNG (`Rng`) — xorshift, reproducible for tests
+- [x] Value/Perlin noise (`Noise`) — seeded, bounded output
+- [x] `Aabb` axis-aligned box + intersection / sweep helpers
+- [x] `GameConfig` tunables (gravity, speeds, tile size…)
+- [x] Input abstraction (`IInputSource`, `InputState`, scripted source)
+- [x] `TileType` + `TileMap` (grid, solidity, world↔tile, collision queries)
+- [x] `AbilitySet` progression / inventory
+- [x] xUnit: RNG, noise bounds, AABB, tilemap, abilities
 
 ## Milestone 2 — Physics & player controller
 - [ ] `Entity` base (position, velocity, size, aabb)
