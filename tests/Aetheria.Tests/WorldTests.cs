@@ -18,11 +18,11 @@ public class WorldTests
     }
 
     [Fact]
-    public void WorldHasSixConnectedRooms()
+    public void WorldHasSevenConnectedRooms()
     {
         var w = WorldBuilder.Build();
-        Assert.Equal(6, w.Rooms.Count);
-        for (int i = 0; i < 6; i++) Assert.True(w.Rooms.ContainsKey(i));
+        Assert.Equal(WorldBuilder.CoreRoomId + 1, w.Rooms.Count);
+        for (int i = 0; i <= WorldBuilder.CoreRoomId; i++) Assert.True(w.Rooms.ContainsKey(i));
         Assert.True(w.Rooms[WorldBuilder.CoreRoomId].IsCore);
         Assert.NotNull(w.Rooms[WorldBuilder.CoreRoomId].CoreCenter);
         Assert.Equal(WorldBuilder.StartRoomId, w.CurrentRoomId);
@@ -32,7 +32,7 @@ public class WorldTests
     public void DoorsWireUpBidirectionally()
     {
         var w = WorldBuilder.Build();
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < WorldBuilder.CoreRoomId; i++)
         {
             var east = w.Rooms[i].DoorOn(Direction.East);
             Assert.NotNull(east);
@@ -132,7 +132,8 @@ public class WorldTests
                 $"{room.Name}: full path not clear with {ability}");
         }
 
-        // with everything unlocked, the Core room is trivially walkable
+        // with everything unlocked, the extra zone and the Core room are walkable
+        Assert.True(Reachability.PathClear(w.Rooms[5], acc));   // Sundered Span (no gate)
         Assert.True(Reachability.PathClear(w.Rooms[WorldBuilder.CoreRoomId], acc));
         Assert.True(acc.HasAll);
     }
@@ -183,7 +184,7 @@ public class WorldTests
         var w = WorldBuilder.Build();
         var p = new Player(w.StartSpawn);
 
-        for (int r = 0; r < 5; r++)
+        for (int r = 0; r < WorldBuilder.CoreRoomId; r++)
         {
             for (int k = 0; k < 25; k++) w.Update(Dt, p); // let transition lock expire
             var east = w.Current.DoorOn(Direction.East)!;

@@ -6,7 +6,7 @@ namespace Aetheria.Engine.World;
 
 public enum Direction { North, East, South, West }
 
-public enum EnemyKind { Crawler, Floater, Sentinel }
+public enum EnemyKind { Crawler, Floater, Sentinel, Charger, Warden }
 
 public readonly record struct GridPoint(int X, int Y);
 

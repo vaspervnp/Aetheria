@@ -25,12 +25,15 @@ public readonly struct InputState
     public readonly bool Pause;
     public readonly bool Confirm;
     public readonly bool Restart;
+    public readonly bool Secondary;   // "New Game" on the title / secondary menu action
+    public readonly bool ToggleMap;
 
     public InputState(
         float moveX = 0f, bool up = false, bool down = false,
         bool jumpPressed = false, bool jumpHeld = false, bool jumpReleased = false,
         bool dashPressed = false, bool attackPressed = false, bool phaseHeld = false,
-        bool pause = false, bool confirm = false, bool restart = false)
+        bool pause = false, bool confirm = false, bool restart = false,
+        bool secondary = false, bool toggleMap = false)
     {
         MoveX = moveX;
         Up = up;
@@ -44,6 +47,8 @@ public readonly struct InputState
         Pause = pause;
         Confirm = confirm;
         Restart = restart;
+        Secondary = secondary;
+        ToggleMap = toggleMap;
     }
 
     public static readonly InputState None = new();

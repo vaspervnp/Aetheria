@@ -12,7 +12,7 @@ namespace Aetheria.Engine.World;
 public static class WorldBuilder
 {
     public const int StartRoomId = 0;
-    public const int CoreRoomId = 5;
+    public const int CoreRoomId = 6;
 
     public static World Build(uint seed = 1337)
     {
@@ -23,7 +23,8 @@ public static class WorldBuilder
             FracturedAscent(seed + 2),
             ConduitShafts(seed + 3),
             PhaseVault(seed + 4),
-            TheCore(seed + 5),
+            SunderedSpan(seed + 5),
+            TheCore(seed + 6),
         };
         return new World(rooms, StartRoomId);
     }
@@ -130,17 +131,41 @@ public static class WorldBuilder
         return b.Build();
     }
 
-    // Room 5 — The Core. Reaching it wins the game.
-    private static Room TheCore(uint seed)
+    // Room 5 — Sundered Span. A combined-ability gauntlet (no new gate) guarded
+    // by the new charger pattern; the additional zone before the Core.
+    private static Room SunderedSpan(uint seed)
     {
-        var b = new RoomBuilder(5, "The Core", 40, 26, seed, 22, isCore: true);
+        var b = new RoomBuilder(5, "Sundered Span", 52, 26, seed, 22);
         b.WestDoor(19, 4);
         b.Spawn(3, 22);
-        b.Platform(26, 33, 20);              // pedestal
-        b.Core(29, 19);
-        b.Enemy(18, 21, EnemyKind.Sentinel, 6);
-        b.Walk(24, 22);                      // walk to the pedestal
-        b.Waypoint(29, 20);                  // step up onto it (2 tiles)
+        b.Pit(12, 16, 3);                    // a chasm to hop/dash
+        b.Block(30, 17, 51, 21);             // raised east ground (double-jump up)
+        b.EastDoor(14, 6);                   // door on the high ground
+        b.Enemy(8, 21, EnemyKind.Charger, 5);
+        b.Enemy(24, 21, EnemyKind.Charger, 6);
+        b.Enemy(20, 12, EnemyKind.Floater, 4);
+        // critical path (all abilities owned by now)
+        b.Walk(11, 22);                      // to the west lip of the chasm
+        b.Waypoint(17, 22);                  // cross it
+        b.Walk(29, 22);                      // to the foot of the raised ground
+        b.Waypoint(31, 17);                  // double-jump up (5 tiles)
+        b.Walk(44, 17);                      // to the east door
+        return b.Build();
+    }
+
+    // Room 6 — The Core, guarded by the Warden boss. Defeat it, then reach the
+    // Core to win the game.
+    private static Room TheCore(uint seed)
+    {
+        var b = new RoomBuilder(6, "The Core", 46, 26, seed, 22, isCore: true);
+        b.WestDoor(19, 5);
+        b.Spawn(3, 22);
+        b.Platform(30, 39, 20);              // pedestal
+        b.Core(34, 19);
+        b.Enemy(32, 9, EnemyKind.Warden, 12);   // the boss
+        b.Enemy(14, 21, EnemyKind.Charger, 6);
+        b.Walk(28, 22);                      // walk to the pedestal
+        b.Waypoint(34, 20);                  // step up onto it
         return b.Build();
     }
 }

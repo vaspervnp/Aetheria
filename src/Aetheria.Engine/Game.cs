@@ -5,6 +5,7 @@ using Aetheria.Engine.Audio;
 using Aetheria.Engine.Core;
 using Aetheria.Engine.Entities;
 using Aetheria.Engine.Gfx;
+using Aetheria.Engine.Persistence;
 using Aetheria.Engine.World;
 
 namespace Aetheria.Engine;
@@ -44,6 +45,11 @@ public sealed class Game : IDisposable
     private float _endTime;
     private int _deaths;
     private bool _hidden;
+    private bool _persist = true;   // disabled during self-tests so they never touch the real save
+    private bool _hasSave;
+    private bool _bossSpawned;
+    private bool _wardenWasAlive;
+    private bool _showMap = true;
     private readonly Rng _fx = new(0x51A2);
 
     public Game(uint seed = 1337) => _seed = seed;
@@ -72,6 +78,7 @@ public sealed class Game : IDisposable
     public int RunSelfTest(int frames = 600, string? shotDir = null, int startRoom = 0)
     {
         _hidden = shotDir == null;   // screenshot capture needs a presented framebuffer
+        _persist = false;            // never touch the player's real save file
         try { Init(); }
         catch (Exception e) { Console.WriteLine("render self-test: init failed: " + e.Message); return 2; }
 
@@ -140,11 +147,13 @@ public sealed class Game : IDisposable
         _particles = new ParticleSystem();
         _input = new RaylibInput();
 
-        NewGame();
+        _hasSave = SaveStore.Exists();
+        BuildRun();          // world for the title backdrop; does not touch the save
+        _deaths = 0;
         _state = GameState.Title;
     }
 
-    private void NewGame()
+    private void BuildRun()
     {
         _world = WorldBuilder.Build(_seed);
         _world.RoomChanged += OnRoomChanged;
@@ -154,9 +163,36 @@ public sealed class Game : IDisposable
         LoadRoomEntities();
         _particles.Clear();
         _cam.SnapTo(_player.Center);
-        _deaths = 0;
         _flash = 0f;
         _bannerTime = 0f;
+    }
+
+    /// <summary>Start a brand-new run (wipes any checkpoint).</summary>
+    private void NewGame()
+    {
+        BuildRun();
+        _deaths = 0;
+        if (_persist) SaveStore.Delete();
+        Autosave();
+    }
+
+    /// <summary>Resume from the saved checkpoint (last room + reclaimed abilities).</summary>
+    private void ContinueGame()
+    {
+        BuildRun();
+        var data = SaveStore.Load();
+        if (data == null) { _deaths = 0; return; }
+        SaveGame.Apply(data, _world, _player);
+        _deaths = data.Deaths;
+        LoadRoomEntities();          // room changed by Apply → refresh entities
+        _cam.SnapTo(_player.Center);
+    }
+
+    private void Autosave()
+    {
+        if (!_persist) return;
+        SaveStore.Save(SaveGame.Capture(_world, _player, _deaths));
+        _hasSave = true;
     }
 
     private void LoadRoomEntities()
@@ -165,6 +201,8 @@ public sealed class Game : IDisposable
         foreach (var s in _world.Current.Enemies)
             _enemies.Add(Enemy.FromSpawn(s, TS));
         _projectiles = new List<Projectile>();
+        _bossSpawned = _enemies.Exists(e => e.Kind == EnemyKind.Warden);
+        _wardenWasAlive = _bossSpawned;
     }
 
     private void OnRoomChanged(Room _, Room next)
@@ -174,11 +212,13 @@ public sealed class Game : IDisposable
         _cam.SnapTo(_player.Center);
         _flash = MathF.Max(_flash, 0.5f);
         _audio.Play(Sfx.Transition);
+        Autosave();                 // each room is a checkpoint
     }
 
     private void OnAbilityUnlocked(AbilityType ability)
     {
         _audio.Play(Sfx.Unlock);
+        Autosave();
         _flash = MathF.Max(_flash, 0.55f);
         _banner = AbilitySet.DisplayName(ability) + " acquired";
         _bannerTime = 3.2f;
@@ -195,19 +235,31 @@ public sealed class Game : IDisposable
         switch (_state)
         {
             case GameState.Title:
-                if (input.Confirm) { NewGame(); _state = GameState.Playing; }
+                if (input.Secondary) { NewGame(); _state = GameState.Playing; }
+                else if (input.Confirm)
+                {
+                    if (_hasSave) ContinueGame(); else NewGame();
+                    _state = GameState.Playing;
+                }
                 break;
             case GameState.Playing:
                 UpdatePlaying(input, dt);
                 break;
             case GameState.Paused:
                 _particles.Update(dt);
+                if (input.ToggleMap) _showMap = !_showMap;
                 if (input.Pause || input.Confirm) _state = GameState.Playing;
                 break;
             case GameState.Dead:
                 _endTime += dt;
                 _particles.Update(dt);
-                if (input.Restart) { NewGame(); _state = GameState.Playing; }
+                // R resumes the last checkpoint; N starts a fresh run
+                if (input.Secondary) { NewGame(); _state = GameState.Playing; }
+                else if (input.Restart)
+                {
+                    if (_hasSave) ContinueGame(); else NewGame();
+                    _state = GameState.Playing;
+                }
                 break;
             case GameState.Victory:
                 _endTime += dt;
@@ -221,11 +273,17 @@ public sealed class Game : IDisposable
     private void UpdatePlaying(InputState input, float dt)
     {
         if (input.Pause) { _state = GameState.Paused; return; }
+        if (input.ToggleMap) _showMap = !_showMap;
 
         var map = _world.Current.Map;
         _player.Update(input, map, dt);
         CombatSystem.Step(_player, _enemies, _projectiles, map, dt, OnEffect);
         _world.Update(dt, _player);
+
+        // boss lifecycle
+        bool wardenAlive = _enemies.Exists(e => e.Kind == EnemyKind.Warden);
+        if (_bossSpawned && _wardenWasAlive && !wardenAlive) OnBossDefeated();
+        _wardenWasAlive = wardenAlive;
 
         HandlePlayerEvents();
 
@@ -253,13 +311,28 @@ public sealed class Game : IDisposable
             _deaths++;
             return;
         }
-        if (_world.ReachedCore)
+        // the Core only accepts Spark once its Warden guardian has fallen
+        bool bossBlocking = _bossSpawned && _enemies.Exists(e => e.Kind == EnemyKind.Warden && e.AliveState);
+        if (_world.ReachedCore && !bossBlocking)
         {
             _state = GameState.Victory;
             _endTime = 0f;
             _audio.Play(Sfx.Victory);
             _cam.Shake(5f, 0.6f);
+            if (_persist) SaveStore.Delete();   // run complete
+            _hasSave = false;
         }
+    }
+
+    private void OnBossDefeated()
+    {
+        _audio.Play(Sfx.EnemyDead);
+        _cam.Shake(9f, 0.9f);
+        _flash = MathF.Max(_flash, 0.7f);
+        _banner = "The Warden falls — the Core lies exposed";
+        _bannerTime = 3.5f;
+        if (_world.Current.CoreCenter is { } c)
+            _particles.Burst(c, 60, Palette.CoreGlow, 200f, 1.2f, 3.5f);
     }
 
     private void HandlePlayerEvents()
@@ -327,6 +400,8 @@ public sealed class Game : IDisposable
         {
             DrawWorld();
             Hud.Draw(_player, _world, _sw, _sh);
+            if (_showMap) Minimap.Draw(_world, _sw, _sh);
+            DrawBossBar();
         }
 
         if (_flash > 0f)
@@ -404,17 +479,26 @@ public sealed class Game : IDisposable
     private void DrawCore()
     {
         if (_world.Current.CoreCenter is not { } c) return;
+        bool locked = _bossSpawned && _enemies.Exists(e => e.Kind == EnemyKind.Warden && e.AliveState);
+        float dim = locked ? 0.4f : 1f;
         float pulse = 1f + MathF.Sin(_time * 3f) * 0.12f;
         Raylib.BeginBlendMode(BlendMode.Additive);
-        Raylib.DrawCircleV(c, 26f * pulse, Raylib.Fade(Palette.Core, 0.25f));
-        Raylib.DrawCircleV(c, 16f * pulse, Raylib.Fade(Palette.Core, 0.4f));
+        Raylib.DrawCircleV(c, 26f * pulse, Raylib.Fade(Palette.Core, 0.25f * dim));
+        Raylib.DrawCircleV(c, 16f * pulse, Raylib.Fade(Palette.Core, 0.4f * dim));
         Raylib.EndBlendMode();
-        Raylib.DrawCircleV(c, 10f, Palette.Core);
-        Raylib.DrawCircleV(c, 5f, Palette.CoreGlow);
+        Raylib.DrawCircleV(c, 10f, Raylib.Fade(Palette.Core, dim));
+        Raylib.DrawCircleV(c, 5f, Raylib.Fade(Palette.CoreGlow, dim));
         for (int i = 0; i < 3; i++)
         {
             float r = 20f + i * 6f + MathF.Sin(_time * 2f + i) * 2f;
-            Raylib.DrawRing(c, r, r + 1.2f, 0, 360, 32, Raylib.Fade(Palette.Core, 0.5f));
+            Raylib.DrawRing(c, r, r + 1.2f, 0, 360, 32, Raylib.Fade(Palette.Core, 0.5f * dim));
+        }
+        if (locked)
+        {
+            // a rotating hex shield telegraphs that the Warden must fall first
+            float sr = 34f + MathF.Sin(_time * 2.5f) * 2f;
+            Raylib.DrawPoly(c, 6, sr, _time * 30f, Raylib.Fade(Palette.Phase, 0f));
+            Raylib.DrawRing(c, sr, sr + 1.6f, 0, 360, 6, Raylib.Fade(Palette.PhaseGlow, 0.7f));
         }
     }
 
@@ -451,8 +535,56 @@ public sealed class Game : IDisposable
                     Raylib.DrawPoly(c, 6, e.Width * 0.4f, -_time * 30f, Palette.Rgb(60, 30, 20));
                     Raylib.DrawCircleV(c, 3.5f, Palette.EnemyEye);
                     break;
+                case EnemyKind.Charger:
+                    DrawCharger(e, c);
+                    break;
+                case EnemyKind.Warden:
+                    DrawWarden(e, c);
+                    break;
             }
         }
+    }
+
+    private static readonly Color ChargerCol = Palette.Rgb(235, 120, 70);
+
+    private void DrawCharger(Enemy e, System.Numerics.Vector2 c)
+    {
+        // telegraph: bright warning ring while winding up, streak while charging
+        if (e.WindingUp)
+        {
+            float k = 0.5f + 0.5f * MathF.Sin(_time * 40f);
+            Raylib.BeginBlendMode(BlendMode.Additive);
+            Raylib.DrawCircleV(c, 14f, Raylib.Fade(Palette.Hazard, 0.35f * k));
+            Raylib.EndBlendMode();
+        }
+        if (e.Charging)
+        {
+            Raylib.BeginBlendMode(BlendMode.Additive);
+            Raylib.DrawCircleV(new System.Numerics.Vector2(c.X - e.Facing * 8f, c.Y), 8f, Raylib.Fade(ChargerCol, 0.4f));
+            Raylib.EndBlendMode();
+        }
+        Raylib.DrawRectangleRounded(new Rectangle(e.Position.X, e.Position.Y, e.Width, e.Height), 0.35f, 6, ChargerCol);
+        // forward spike
+        Raylib.DrawTriangle(
+            new System.Numerics.Vector2(c.X + e.Facing * (e.Width * 0.5f + 5f), c.Y),
+            new System.Numerics.Vector2(c.X + e.Facing * e.Width * 0.5f, c.Y - 4f),
+            new System.Numerics.Vector2(c.X + e.Facing * e.Width * 0.5f, c.Y + 4f),
+            Palette.Rgb(255, 200, 120));
+        Raylib.DrawCircleV(new System.Numerics.Vector2(c.X + e.Facing * 3f, c.Y - 1f), 2f, Palette.EnemyEye);
+    }
+
+    private void DrawWarden(Enemy e, System.Numerics.Vector2 c)
+    {
+        var core = e.Enraged ? Palette.Rgb(255, 80, 90) : Palette.Sentinel;
+        float r = e.Width * 0.55f;
+        Raylib.BeginBlendMode(BlendMode.Additive);
+        Raylib.DrawCircleV(c, r + 12f, Raylib.Fade(core, 0.25f));
+        Raylib.EndBlendMode();
+        Raylib.DrawPoly(c, 8, r, _time * 25f, Palette.Rgb(70, 40, 30));
+        Raylib.DrawPoly(c, 6, r * 0.8f, -_time * 35f, core);
+        Raylib.DrawPoly(c, 3, r * 0.5f, _time * 60f, Palette.Rgb(30, 16, 12));
+        Raylib.DrawCircleV(c, 5f, Palette.EnemyEye);
+        Raylib.DrawCircleV(c, 2.5f, e.Enraged ? Palette.Hazard : Palette.Rgb(255, 180, 90));
     }
 
     private void DrawProjectiles()
@@ -513,10 +645,11 @@ public sealed class Game : IDisposable
         CenterText("AETHERIA", cy - 150, 84, Raylib.Fade(Palette.Spark, 0.85f + 0.15f * g));
         CenterText("THE BIO-MECHANICAL ABYSS", cy - 78, 26, Palette.InkDim);
         CenterText("You are Spark. Reignite the Core.", cy - 10, 20, Palette.Ink);
-        CenterText("Press  ENTER  /  SPACE  to awaken", cy + 40, 22,
-            Raylib.Fade(Palette.Pickup, 0.6f + 0.4f * MathF.Sin(_time * 4f)));
+        string prompt = _hasSave ? "ENTER — Continue      N — New Game" : "Press  ENTER  /  SPACE  to awaken";
+        CenterText(prompt, cy + 40, 22, Raylib.Fade(Palette.Pickup, 0.6f + 0.4f * MathF.Sin(_time * 4f)));
         CenterText("Move: A/D  ·  Jump: SPACE  ·  Dash: SHIFT  ·  Pulse: J  ·  Climb: hold into wall + W  ·  Phase: hold F",
-            cy + 130, 15, Palette.InkDim);
+            cy + 124, 15, Palette.InkDim);
+        CenterText("Pause: P/ESC  ·  Map: TAB/M", cy + 148, 15, Palette.InkDim);
     }
 
     private void DrawPaused()
@@ -532,8 +665,8 @@ public sealed class Game : IDisposable
         Raylib.DrawRectangle(0, 0, _sw, _sh, Raylib.Fade(Palette.Hazard, 0.06f));
         CenterText("SIGNAL LOST", _sh / 2 - 40, 66, Raylib.Fade(Palette.Hazard, 0.9f));
         CenterText("The pulse fades into the dark…", _sh / 2 + 30, 20, Palette.InkDim);
-        CenterText("Press  R  to reignite", _sh / 2 + 66, 22,
-            Raylib.Fade(Palette.Ink, 0.5f + 0.5f * MathF.Sin(_time * 4f)));
+        string resume = _hasSave ? "R — resume last checkpoint      N — new run" : "Press  R  to reignite";
+        CenterText(resume, _sh / 2 + 66, 22, Raylib.Fade(Palette.Ink, 0.5f + 0.5f * MathF.Sin(_time * 4f)));
     }
 
     private void DrawVictory()
@@ -546,6 +679,24 @@ public sealed class Game : IDisposable
             cy + 24, 20, Palette.InkDim);
         CenterText("Press  R  to return to the title", cy + 80, 20,
             Raylib.Fade(Palette.Ink, 0.5f + 0.5f * MathF.Sin(_time * 4f)));
+    }
+
+    private void DrawBossBar()
+    {
+        var warden = _enemies.Find(e => e.Kind == EnemyKind.Warden && e.AliveState);
+        if (warden == null) return;
+        int w = Math.Min(520, _sw - 120), h = 14;
+        int x = (_sw - w) / 2, y = _sh - 70;
+        Raylib.DrawRectangleRounded(new Rectangle(x - 3, y - 3, w + 6, h + 6), 0.5f, 6, Palette.Panel);
+        Raylib.DrawRectangleRounded(new Rectangle(x, y, w, h), 0.5f, 6, Palette.HealthOff);
+        float f = warden.HealthFraction;
+        if (f > 0.01f)
+        {
+            var col = warden.Enraged ? Palette.Hazard : Palette.Sentinel;
+            Raylib.DrawRectangleRounded(new Rectangle(x, y, w * f, h), 0.5f, 6, col);
+        }
+        const string label = "THE WARDEN";
+        Raylib.DrawText(label, (_sw - Raylib.MeasureText(label, 14)) / 2, y - 18, 14, Palette.Ink);
     }
 
     private void DrawBanner()

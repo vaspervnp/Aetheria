@@ -73,8 +73,15 @@ either the xUnit suite or the `--smoke` head-less simulation.
       PNGs; `--room N` warps for per-room visual checks
 - [x] Debug + Release builds clean; visually verified every room + all overlays
 
-## Backlog / possible future polish
-- [ ] Save/load of unlocked abilities & last room
-- [ ] Minimap overlay
-- [ ] Additional zones, bosses, and a second guardian pattern
-- [ ] Gamepad support via Raylib gamepad API
+## Backlog — done
+- [x] Save/load of unlocked abilities & last room (checkpoint per room; Continue
+      on title/death; `SaveGame`/`SaveStore`, tested round-trip + apply)
+- [x] Minimap overlay (`Minimap`, room chain, visited/current/Core, Tab/M toggle)
+- [x] Additional zone (**Sundered Span**), a **boss** (the Warden: HP bar, Core
+      shield, enrage + projectile fans), and a second guardian pattern (**Charger**
+      with telegraphed charge) — all with new tests
+- [x] Gamepad support via the Raylib gamepad API (sticks/d-pad + buttons)
+
+## Further ideas (not yet done)
+- [ ] Second boss / branching zones with non-linear doors
+- [ ] Settings screen (volume, key rebinding)

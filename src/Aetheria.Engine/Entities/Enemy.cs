@@ -29,6 +29,8 @@ public sealed class Enemy : Entity
     private float _fireTimer;
     private float _hitInvuln;
     private bool _grounded;
+    private int _mode;          // charger state: 0 patrol, 1 windup, 2 charge, 3 recover
+    private float _modeTimer;
 
     private readonly float _speed;
 
@@ -44,6 +46,8 @@ public sealed class Enemy : Entity
             EnemyKind.Crawler => (2, 52f),
             EnemyKind.Floater => (2, 42f),
             EnemyKind.Sentinel => (6, 34f),
+            EnemyKind.Charger => (3, 60f),
+            EnemyKind.Warden => (22, 30f),
             _ => (2, 50f),
         };
         Health = MaxHealth;
@@ -56,8 +60,16 @@ public sealed class Enemy : Entity
         EnemyKind.Crawler => new Vector2(14, 12),
         EnemyKind.Floater => new Vector2(13, 13),
         EnemyKind.Sentinel => new Vector2(20, 20),
+        EnemyKind.Charger => new Vector2(16, 14),
+        EnemyKind.Warden => new Vector2(30, 30),
         _ => new Vector2(14, 14),
     };
+
+    public bool IsBoss => Kind == EnemyKind.Warden;
+    public bool Charging => Kind == EnemyKind.Charger && _mode == 2;
+    public bool WindingUp => Kind == EnemyKind.Charger && _mode == 1;
+    public bool Enraged => Kind == EnemyKind.Warden && Health * 2 <= MaxHealth;
+    public float HealthFraction => MaxHealth <= 0 ? 0f : Health / (float)MaxHealth;
 
     public static Enemy FromSpawn(EnemySpawn spawn, int tileSize)
         => new(spawn.Kind, spawn.WorldCenter(tileSize), spawn.Range * tileSize);
@@ -86,7 +98,111 @@ public sealed class Enemy : Entity
             case EnemyKind.Crawler: UpdateCrawler(map, dt); break;
             case EnemyKind.Floater: UpdateFloater(map, dt); break;
             case EnemyKind.Sentinel: UpdateSentinel(map, player, dt, projectiles); break;
+            case EnemyKind.Charger: UpdateCharger(map, player, dt); break;
+            case EnemyKind.Warden: UpdateWarden(map, player, dt, projectiles); break;
         }
+    }
+
+    private void UpdateCharger(TileMap map, Player player, float dt)
+    {
+        Velocity.Y += GameConfig.Gravity * dt;
+        if (Velocity.Y > GameConfig.MaxFallSpeed) Velocity.Y = GameConfig.MaxFallSpeed;
+        var (_, ground, _) = TileCollider.MoveY(map, ref Position, ref Velocity, Width, Height, Velocity.Y * dt);
+        _grounded = ground;
+
+        switch (_mode)
+        {
+            case 0: // patrol
+                if (Center.X < Home.X - Range) Facing = 1;
+                else if (Center.X > Home.X + Range) Facing = -1;
+                TurnAtLedge(map);
+                Velocity.X = Facing * _speed;
+                float dx = player.Center.X - Center.X;
+                float dy = MathF.Abs(player.Center.Y - Center.Y);
+                if (player.Alive && _grounded && MathF.Abs(dx) < Range * 1.5f && dy < 1.6f * map.TileSize)
+                {
+                    Facing = dx >= 0 ? 1 : -1;
+                    _mode = 1; _modeTimer = 0.45f; Velocity.X = 0f;   // wind up (telegraph)
+                }
+                break;
+            case 1: // windup
+                Velocity.X = 0f;
+                _modeTimer -= dt;
+                if (_modeTimer <= 0f) { _mode = 2; _modeTimer = 0.8f; }
+                break;
+            case 2: // charge
+                Velocity.X = Facing * 255f;
+                _modeTimer -= dt;
+                if (_modeTimer <= 0f || WouldFallAhead(map)) { _mode = 3; _modeTimer = 0.5f; Velocity.X = 0f; }
+                break;
+            case 3: // recover
+                Velocity.X = MoveToward(Velocity.X, 0f, 500f * dt);
+                _modeTimer -= dt;
+                if (_modeTimer <= 0f) _mode = 0;
+                break;
+        }
+
+        bool hitWall = TileCollider.MoveX(map, ref Position, ref Velocity, Width, Height, Velocity.X * dt);
+        if (hitWall)
+        {
+            if (_mode == 2) { _mode = 3; _modeTimer = 0.5f; }
+            else Facing = -Facing;
+        }
+    }
+
+    private void UpdateWarden(TileMap map, Player player, float dt, List<Projectile> projectiles)
+    {
+        float targetX = Math.Clamp(player.Center.X, Home.X - Range, Home.X + Range);
+        float nx = Center.X + Math.Clamp(targetX - Center.X, -_speed * dt, _speed * dt);
+        float ny = Home.Y + MathF.Sin(_t * 1.4f) * 10f;
+        Position = new Vector2(nx - Width * 0.5f, ny - Height * 0.5f);
+        Facing = player.Center.X >= Center.X ? 1 : -1;
+
+        _fireTimer -= dt;
+        if (_fireTimer <= 0f && player.Alive && Vector2.Distance(Center, player.Center) < 460f)
+        {
+            _fireTimer = Enraged ? 1.05f : 1.9f;              // enrage below half health
+            FireFan(player, projectiles, Enraged ? 5 : 3, Enraged ? 34f : 22f, 130f);
+        }
+    }
+
+    private void FireFan(Player player, List<Projectile> projectiles, int count, float spreadDeg, float speed)
+    {
+        Vector2 dir = player.Center - Center;
+        dir = dir.LengthSquared() < 0.01f ? new Vector2(Facing, 0f) : Vector2.Normalize(dir);
+        float baseAng = MathF.Atan2(dir.Y, dir.X);
+        float spread = spreadDeg * MathF.PI / 180f;
+        for (int i = 0; i < count; i++)
+        {
+            float t = count == 1 ? 0.5f : i / (float)(count - 1);
+            float ang = baseAng + (t - 0.5f) * spread;
+            var v = new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * speed;
+            projectiles.Add(new Projectile(Center, v, 4f, 3.6f, 1, fromPlayer: false));
+        }
+    }
+
+    private void TurnAtLedge(TileMap map)
+    {
+        if (!_grounded) return;
+        float frontX = Facing > 0 ? Bounds.Right + 1f : Bounds.Left - 1f;
+        int ftx = map.WorldToTileX(frontX);
+        int fty = map.WorldToTileY(Bounds.Bottom + 1f);
+        if (!map.IsSolidTile(ftx, fty)) Facing = -Facing;
+    }
+
+    private bool WouldFallAhead(TileMap map)
+    {
+        if (!_grounded) return false;
+        float frontX = Facing > 0 ? Bounds.Right + 2f : Bounds.Left - 2f;
+        int ftx = map.WorldToTileX(frontX);
+        int fty = map.WorldToTileY(Bounds.Bottom + 1f);
+        return !map.IsSolidTile(ftx, fty);
+    }
+
+    private static float MoveToward(float current, float target, float maxDelta)
+    {
+        if (MathF.Abs(target - current) <= maxDelta) return target;
+        return current + MathF.Sign(target - current) * maxDelta;
     }
 
     private void UpdateCrawler(TileMap map, float dt)

@@ -27,11 +27,16 @@ public sealed class World
     public bool JustTransitioned { get; private set; }
     public bool ReachedCore { get; private set; }
 
+    private readonly HashSet<int> _visited = new();
+    /// <summary>Ids of rooms Spark has entered this run (drives the minimap).</summary>
+    public IReadOnlyCollection<int> Visited => _visited;
+
     public World(IEnumerable<Room> rooms, int startRoomId)
     {
         _rooms = rooms.ToDictionary(r => r.Id);
         _startRoomId = startRoomId;
         Current = _rooms[startRoomId];
+        _visited.Add(startRoomId);
     }
 
     public Vector2 StartSpawn => _rooms[_startRoomId].DefaultSpawn;
@@ -64,6 +69,7 @@ public sealed class World
         if (!_rooms.TryGetValue(roomId, out var next)) return;
         var old = Current;
         Current = next;
+        _visited.Add(next.Id);
         var entry = next.DoorOn(viaEdge);
         player.PlaceAt(entry?.EntrySpawn ?? next.DefaultSpawn);
         _transitionLock = 0.3f;
@@ -98,6 +104,7 @@ public sealed class World
     {
         if (!_rooms.TryGetValue(roomId, out var r)) return;
         Current = r;
+        _visited.Add(roomId);
         player.PlaceAt(r.DefaultSpawn);
         _transitionLock = 0.3f;
     }
@@ -109,6 +116,8 @@ public sealed class World
         _transitionLock = 0f;
         ReachedCore = false;
         JustTransitioned = false;
+        _visited.Clear();
+        _visited.Add(_startRoomId);
         foreach (var room in _rooms.Values)
             foreach (var p in room.Pickups)
                 p.Taken = false;
