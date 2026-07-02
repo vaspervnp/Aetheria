@@ -126,6 +126,21 @@ public static class MapGenerator
         PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.Phase, Biome.Mainframe, start, core, rng);
         PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.WallClimb, Biome.Mainframe, start, core, rng);
 
+        // weapons + destructible cracked walls
+        PlaceWeapon(rooms, cells, BiomeAt, WeaponType.Scatter, Biome.CrystalConduits, start, core, rng);
+        PlaceWeapon(rooms, cells, BiomeAt, WeaponType.Blade, Biome.Mainframe, start, core, rng);
+        foreach (var c in cells)
+        {
+            if (c == start || c == core) continue;
+            var rw = new Rng(rooms[c].Seed ^ 0xC4A0);
+            if (rw.Chance(0.18f))
+            {
+                int col = rw.Range(9, 14);
+                rooms[c].Map.Set(col, Floor - 1, TileType.Cracked);
+                rooms[c].Map.Set(col, Floor - 2, TileType.Cracked);
+            }
+        }
+
         // ---- 6. enemies ----------------------------------------------------
         foreach (var c in cells)
         {
@@ -270,6 +285,19 @@ public static class MapGenerator
         var cell = candidates[rng.Range(0, candidates.Count)];
         int col = RoomInterior.SafeFloorColumn(rng, rooms[cell].HasDoor(Direction.South));
         rooms[cell].Pickups.Add(new AbilityPickup { Tile = new GridPoint(col, Floor - 2), Type = ability });
+    }
+
+    private static void PlaceWeapon(
+        Dictionary<GridPoint, Room> rooms, List<GridPoint> cells, Func<GridPoint, Biome> biomeAt,
+        WeaponType weapon, Biome biome, GridPoint start, GridPoint core, Rng rng)
+    {
+        var candidates = cells.Where(c => biomeAt(c) == biome && c != start && c != core
+                                          && !rooms[c].Pickups.Any() && !rooms[c].WeaponPickups.Any()).ToList();
+        if (candidates.Count == 0) candidates = cells.Where(c => biomeAt(c) == biome && c != core).ToList();
+        if (candidates.Count == 0) return;
+        var cell = candidates[rng.Range(0, candidates.Count)];
+        int col = RoomInterior.SafeFloorColumn(rng, rooms[cell].HasDoor(Direction.South));
+        rooms[cell].WeaponPickups.Add(new WeaponPickup { Tile = new GridPoint(col, Floor - 2), Type = weapon });
     }
 
     private static void PopulateEnemies(Room room, Biome biome, HashSet<Direction> doors, Rng rng)

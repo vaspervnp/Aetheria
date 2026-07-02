@@ -11,6 +11,7 @@ public sealed class SaveData
     public int CellY { get; set; }
     public int Deaths { get; set; }
     public List<AbilityType> Abilities { get; set; } = new();
+    public List<WeaponType> Weapons { get; set; } = new();
     public Dictionary<string, int> Flags { get; set; } = new();
 
     public bool HasAbility(AbilityType a) => Abilities.Contains(a);
@@ -31,6 +32,7 @@ public static class SaveGame
             CellY = world.CurrentCell.Y,
             Deaths = deaths,
             Abilities = player.Abilities.Unlocked.OrderBy(a => (int)a).ToList(),
+            Weapons = player.Weapons.Owned.Where(w => w != WeaponType.Blaster).ToList(),
             Flags = world.Flags.NonZero.ToDictionary(kv => kv.Key, kv => kv.Value),
         };
 
@@ -41,9 +43,14 @@ public static class SaveGame
     public static void Apply(SaveData data, World.World world, Player player)
     {
         foreach (var a in data.Abilities) player.Abilities.Unlock(a);
+        foreach (var w in data.Weapons) player.Weapons.Unlock(w);
         foreach (var room in world.Rooms.Values)
+        {
             foreach (var pickup in room.Pickups)
                 if (data.Abilities.Contains(pickup.Type)) pickup.Taken = true;
+            foreach (var wp in room.WeaponPickups)
+                if (data.Weapons.Contains(wp.Type)) wp.Taken = true;
+        }
         world.Flags.LoadFrom(data.Flags);
         world.DebugEnter(data.Cell, player);
     }

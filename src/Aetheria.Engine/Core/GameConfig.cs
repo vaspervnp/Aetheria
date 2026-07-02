@@ -53,6 +53,25 @@ public static class GameConfig
     public const float PulseCost = 18f;
     public const float PulseCooldown = 0.28f;
     public const int PulseDamage = 2;
+
+    // ---- weapons ------------------------------------------------------------
+    public const float BlasterCost = 7f;
+    public const float BlasterCooldown = 0.20f;
+    public const int BlasterDamage = 2;
+    public const float BlasterSpeed = 390f;
+
+    public const float ScatterCost = 22f;
+    public const float ScatterCooldown = 0.5f;
+    public const int ScatterDamage = 1;
+    public const float ScatterSpeed = 320f;
+    public const int ScatterPellets = 6;
+    public const float ScatterSpreadDeg = 34f;
+    public const float ScatterLife = 0.26f;
+
+    public const float BladeCost = 12f;
+    public const float BladeCooldown = 0.34f;
+    public const float BladeTime = 0.16f;
+    public const int BladeDamage = 4;
     public const int DashDamage = 1;
     public const float InvulnTime = 1.0f;         // after taking damage
     public const int ContactDamage = 1;

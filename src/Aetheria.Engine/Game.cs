@@ -160,6 +160,7 @@ public sealed class Game : IDisposable
         _world = MapGenerator.Generate(_seed);
         _world.RoomChanged += OnRoomChanged;
         _world.AbilityUnlocked += OnAbilityUnlocked;
+        _world.WeaponUnlocked += OnWeaponUnlocked;
         _player = new Player(_world.StartSpawn);
         _player.Respawn(_world.StartSpawn);
         LoadRoomEntities();
@@ -231,6 +232,16 @@ public sealed class Game : IDisposable
         _cam.Shake(3.5f, 0.35f);
     }
 
+    private void OnWeaponUnlocked(WeaponType weapon)
+    {
+        _audio.Play(Sfx.Unlock);
+        _flash = MathF.Max(_flash, 0.5f);
+        _banner = Arsenal.Name(weapon) + " acquired";
+        _bannerTime = 3.2f;
+        _particles.Burst(_player.Center, 40, Palette.Circuit, 150f, 0.8f, 3f);
+        _cam.Shake(3f, 0.3f);
+    }
+
     // ---- update -------------------------------------------------------------
     private void Update(InputState input, float dt)
     {
@@ -294,6 +305,13 @@ public sealed class Game : IDisposable
 
         HandlePlayerEvents();
 
+        if (input.SwitchWeapon && _player.Weapons.Count > 1)
+        {
+            _banner = "Weapon — " + Arsenal.Name(_player.Weapons.Current);
+            _bannerTime = 1.3f;
+            _audio.Play(Sfx.Pickup);
+        }
+
         if (_player.Dashing)
             _particles.Trail(_player.Center, Palette.SparkTrail);
 
@@ -349,6 +367,18 @@ public sealed class Game : IDisposable
         if (_player.JustWallJumped) { _audio.Play(Sfx.Jump); Dust(); }
         if (_player.JustDashed) { _audio.Play(Sfx.Dash); _particles.Burst(_player.Center, 14, Palette.SparkTrail, 160f, 0.4f, 2.6f); _cam.Shake(2f, 0.2f); }
         if (_player.JustLanded) Dust();
+        if (_player.JustFired)
+        {
+            _audio.Play(_player.FireWeapon == WeaponType.Scatter ? Sfx.Scatter : Sfx.Pulse);
+            _particles.Burst(_player.FireOrigin, _player.FireWeapon == WeaponType.Scatter ? 10 : 5, Palette.Spark, 90f, 0.3f, 2f);
+        }
+        if (_player.JustBladed)
+        {
+            _audio.Play(Sfx.Blade);
+            _cam.Shake(1.5f, 0.15f);
+            if (_player.MeleeHitbox is { } b)
+                _particles.Burst(new Vector2(b.CenterX, b.CenterY), 12, Palette.Circuit, 120f, 0.25f, 2.6f);
+        }
         if (_player.JustHurt)
         {
             _audio.Play(_player.Alive ? Sfx.Hurt : Sfx.Death);
@@ -543,6 +573,18 @@ public sealed class Game : IDisposable
             Raylib.DrawPoly(p, 4, 7f, rot, Palette.Pickup);
             Raylib.DrawPoly(p, 4, 3.5f, rot, Palette.PickupGlow);
         }
+        // weapon pickups (rotating triangle in circuit cyan)
+        foreach (var wp in _world.Current.WeaponPickups)
+        {
+            if (wp.Taken) continue;
+            var cc = wp.WorldCenter(TS);
+            var p = new Vector2(cc.X, cc.Y + MathF.Sin(_time * 3f) * 3f);
+            Raylib.BeginBlendMode(BlendMode.Additive);
+            Raylib.DrawPoly(p, 3, 12f, _time * 70f, Raylib.Fade(Palette.Circuit, 0.35f));
+            Raylib.EndBlendMode();
+            Raylib.DrawPoly(p, 3, 7f, _time * 70f, Palette.Circuit);
+            Raylib.DrawPoly(p, 3, 3.5f, _time * 70f, Palette.SparkCore);
+        }
     }
 
     private void DrawCore()
@@ -684,6 +726,17 @@ public sealed class Game : IDisposable
         Raylib.DrawCircleV(c, 5f, Raylib.Fade(_player.Phasing ? Palette.PhaseGlow : Palette.Spark, a));
         Raylib.DrawCircleV(c, 2.6f, Raylib.Fade(Palette.SparkCore, a));
         Raylib.DrawCircleV(new Vector2(c.X + _player.Facing * 2.2f, c.Y - 0.5f), 1.1f, Raylib.Fade(Palette.Void, a));
+
+        // plasma blade arc
+        if (_player.MeleeHitbox is { } b)
+        {
+            var bc = new Vector2(b.CenterX, b.CenterY);
+            Raylib.BeginBlendMode(BlendMode.Additive);
+            Raylib.DrawCircleV(bc, 14f, Raylib.Fade(Palette.Circuit, 0.25f));
+            Raylib.EndBlendMode();
+            float a0 = _player.Facing > 0 ? -60 : 120;
+            Raylib.DrawRing(bc, 10f, 16f, a0, a0 + 120, 16, Raylib.Fade(Palette.SparkCore, 0.9f));
+        }
     }
 
     // ---- overlays -----------------------------------------------------------

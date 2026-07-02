@@ -23,6 +23,7 @@ public sealed class World
 
     public event Action<Room, Room>? RoomChanged;
     public event Action<AbilityType>? AbilityUnlocked;
+    public event Action<WeaponType>? WeaponUnlocked;
 
     public bool JustTransitioned { get; private set; }
     public bool ReachedCore { get; private set; }
@@ -110,6 +111,16 @@ public sealed class World
                 AbilityUnlocked?.Invoke(pickup.Type);
             player.RefillEnergy();
         }
+        foreach (var wp in Current.WeaponPickups)
+        {
+            if (wp.Taken) continue;
+            var box = new Maths.Aabb(wp.Tile.X * ts, wp.Tile.Y * ts, ts, ts);
+            if (!player.Bounds.Intersects(box)) continue;
+            wp.Taken = true;
+            if (player.Weapons.Unlock(wp.Type))
+                WeaponUnlocked?.Invoke(wp.Type);
+            player.RefillEnergy();
+        }
     }
 
     private void CheckCore(Player player)
@@ -142,6 +153,7 @@ public sealed class World
         foreach (var room in _rooms.Values)
         {
             foreach (var p in room.Pickups) p.Taken = false;
+            foreach (var wp in room.WeaponPickups) wp.Taken = false;
             foreach (var s in room.Switches) s.Active = false;
             foreach (var pl in room.Plates) pl.Pressed = false;
             room.Sequence?.Reset();

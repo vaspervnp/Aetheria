@@ -27,13 +27,14 @@ public readonly struct InputState
     public readonly bool Restart;
     public readonly bool Secondary;   // "New Game" on the title / secondary menu action
     public readonly bool ToggleMap;
+    public readonly bool SwitchWeapon;
 
     public InputState(
         float moveX = 0f, bool up = false, bool down = false,
         bool jumpPressed = false, bool jumpHeld = false, bool jumpReleased = false,
         bool dashPressed = false, bool attackPressed = false, bool phaseHeld = false,
         bool pause = false, bool confirm = false, bool restart = false,
-        bool secondary = false, bool toggleMap = false)
+        bool secondary = false, bool toggleMap = false, bool switchWeapon = false)
     {
         MoveX = moveX;
         Up = up;
@@ -49,6 +50,7 @@ public readonly struct InputState
         Restart = restart;
         Secondary = secondary;
         ToggleMap = toggleMap;
+        SwitchWeapon = switchWeapon;
     }
 
     public static readonly InputState None = new();

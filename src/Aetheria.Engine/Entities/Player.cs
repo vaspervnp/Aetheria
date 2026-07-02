@@ -21,6 +21,7 @@ public sealed class Player : Entity
     private const float PhaseMinEnergy = 6f;
 
     public readonly AbilitySet Abilities = new();
+    public readonly Arsenal Weapons = new();
 
     // ---- survivability ------------------------------------------------------
     public int Health { get; private set; } = GameConfig.MaxHealth;
@@ -46,14 +47,18 @@ public sealed class Player : Entity
     public bool JustLanded { get; private set; }
     public bool JustHurt { get; private set; }
     public bool JustDied { get; private set; }
+    public bool JustFired { get; private set; }
+    public bool JustBladed { get; private set; }
 
-    // ---- combat intent (consumed by World) ---------------------------------
-    public bool WantsPulse { get; private set; }
-    public Vector2 PulseOrigin { get; private set; }
-    public int PulseDir { get; private set; } = 1;
+    // ---- combat intent (consumed by CombatSystem) --------------------------
+    public bool WantsFire { get; private set; }
+    public WeaponType FireWeapon { get; private set; }
+    public Vector2 FireOrigin { get; private set; }
+    public int FireDir { get; private set; } = 1;
 
-    /// <summary>Active melee (Plasma Blade) hitbox this frame, or null. Set in P2.5.</summary>
-    public Aabb? MeleeHitbox { get; internal set; }
+    /// <summary>Active melee (Plasma Blade) hitbox this frame, or null.</summary>
+    public Aabb? MeleeHitbox { get; private set; }
+    public bool Blading => _bladeTimer > 0f;
 
     // ---- internal timers ----------------------------------------------------
     private float _coyote;
@@ -65,6 +70,7 @@ public sealed class Player : Entity
     private float _wallJumpLock;
     private float _invulnTimer;
     private float _pulseCooldown;
+    private float _bladeTimer;
     private bool _wasOnGround;
 
     public float DashCooldownFraction =>
@@ -80,9 +86,10 @@ public sealed class Player : Entity
         Health = GameConfig.MaxHealth;
         Energy = GameConfig.MaxEnergy;
         _coyote = _jumpBuffer = _dashTimer = _dashCooldown = 0f;
-        _wallJumpLock = _invulnTimer = _pulseCooldown = 0f;
+        _wallJumpLock = _invulnTimer = _pulseCooldown = _bladeTimer = 0f;
         _hasDoubleJumped = false;
         Phasing = false;
+        MeleeHitbox = null;
         Active = true;
     }
 
@@ -139,12 +146,21 @@ public sealed class Player : Entity
         }
         if (input.MoveX > 0.01f) Facing = 1;
         else if (input.MoveX < -0.01f) Facing = -1;
+
+        MeleeHitbox = _bladeTimer > 0f ? BladeBox() : null;
+    }
+
+    private Aabb BladeBox()
+    {
+        const float bw = 22f, bh = 18f;
+        float bx = Facing > 0 ? Position.X + Width - 2f : Position.X - bw + 2f;
+        return new Aabb(bx, Center.Y - bh * 0.5f, bw, bh);
     }
 
     private void ClearEventFlags()
     {
         JustJumped = JustDoubleJumped = JustWallJumped = JustDashed = false;
-        JustLanded = JustHurt = JustDied = WantsPulse = false;
+        JustLanded = JustHurt = JustDied = WantsFire = JustFired = JustBladed = false;
     }
 
     private void TickTimers(float dt)
@@ -156,6 +172,7 @@ public sealed class Player : Entity
         if (_wallJumpLock > 0) _wallJumpLock -= dt;
         if (_invulnTimer > 0) _invulnTimer -= dt;
         if (_pulseCooldown > 0) _pulseCooldown -= dt;
+        if (_bladeTimer > 0) _bladeTimer -= dt;
     }
 
     private void UpdateDash(InputState input, float dt)
@@ -287,13 +304,37 @@ public sealed class Player : Entity
         if (!Phasing)
             Energy = Math.Min(GameConfig.MaxEnergy, Energy + GameConfig.EnergyRegen * dt);
 
-        if (input.AttackPressed && _pulseCooldown <= 0 && Energy >= GameConfig.PulseCost)
+        if (input.SwitchWeapon) Weapons.Cycle();
+
+        if (!input.AttackPressed || _pulseCooldown > 0f) return;
+
+        var w = Weapons.Current;
+        float cost = w switch
         {
-            Energy -= GameConfig.PulseCost;
-            _pulseCooldown = GameConfig.PulseCooldown;
-            WantsPulse = true;
-            PulseDir = Facing;
-            PulseOrigin = new Vector2(Center.X + Facing * (Width * 0.5f + 3f), Center.Y);
+            WeaponType.Blaster => GameConfig.BlasterCost,
+            WeaponType.Scatter => GameConfig.ScatterCost,
+            _ => GameConfig.BladeCost,
+        };
+        if (Energy < cost) return;
+        Energy -= cost;
+        FireDir = Facing;
+        FireOrigin = new Vector2(Center.X + Facing * (Width * 0.5f + 3f), Center.Y);
+
+        switch (w)
+        {
+            case WeaponType.Blaster:
+                _pulseCooldown = GameConfig.BlasterCooldown;
+                WantsFire = true; FireWeapon = WeaponType.Blaster; JustFired = true;
+                break;
+            case WeaponType.Scatter:
+                _pulseCooldown = GameConfig.ScatterCooldown;
+                WantsFire = true; FireWeapon = WeaponType.Scatter; JustFired = true;
+                break;
+            case WeaponType.Blade:
+                _pulseCooldown = GameConfig.BladeCooldown;
+                _bladeTimer = GameConfig.BladeTime;
+                JustBladed = true;
+                break;
         }
     }
 

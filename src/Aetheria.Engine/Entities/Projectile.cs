@@ -15,6 +15,7 @@ public sealed class Projectile
     public bool FromPlayer;
     public bool Dead;
     public float Age;
+    public bool BreaksWalls;   // Scatter pellets shatter cracked walls
 
     public Projectile(Vector2 pos, Vector2 vel, float radius, float life, int damage, bool fromPlayer)
     {
@@ -34,8 +35,15 @@ public sealed class Projectile
         Position += Velocity * dt;
         Life -= dt;
         if (Life <= 0f) Dead = true;
-        // despawn on hitting solid geometry
+        // despawn on hitting solid geometry; Scatter pellets shatter cracked walls
         if (map.OverlapsSolid(new Aabb(Position.X - 1, Position.Y - 1, 2, 2)))
+        {
+            if (BreaksWalls)
+            {
+                int tx = map.WorldToTileX(Position.X), ty = map.WorldToTileY(Position.Y);
+                if (map.Get(tx, ty) == TileType.Cracked) map.Set(tx, ty, TileType.Empty);
+            }
             Dead = true;
+        }
     }
 }

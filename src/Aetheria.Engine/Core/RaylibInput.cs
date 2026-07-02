@@ -35,6 +35,7 @@ public sealed class RaylibInput : IInputSource
         bool restart = Pressed(KeyboardKey.R);
         bool secondary = Pressed(KeyboardKey.N);
         bool toggleMap = Pressed(KeyboardKey.Tab) || Pressed(KeyboardKey.M);
+        bool switchWeapon = Pressed(KeyboardKey.Q) || Pressed(KeyboardKey.E);
 
         // ---- gamepad 0 (layered over the keyboard) --------------------------
         if (Raylib.IsGamepadAvailable(0))
@@ -60,8 +61,11 @@ public sealed class RaylibInput : IInputSource
             toggleMap |= GpPressed(GamepadButton.RightFaceRight);
         }
 
+        if (Raylib.IsGamepadAvailable(0))
+            switchWeapon |= GpPressed(GamepadButton.RightTrigger2);
+
         return new InputState(mx, up, down, jumpPressed, jumpHeld, jumpReleased,
-            dash, attack, phase, pause, confirm, restart, secondary, toggleMap);
+            dash, attack, phase, pause, confirm, restart, secondary, toggleMap, switchWeapon);
     }
 
     private static bool GpDown(GamepadButton b) => Raylib.IsGamepadButtonDown(0, b);

@@ -53,6 +53,16 @@ public sealed class AbilityPickup
         => new((Tile.X + 0.5f) * tileSize, (Tile.Y + 0.5f) * tileSize);
 }
 
+public sealed class WeaponPickup
+{
+    public required GridPoint Tile { get; init; }
+    public required WeaponType Type { get; init; }
+    public bool Taken { get; set; }
+
+    public Vector2 WorldCenter(int tileSize)
+        => new((Tile.X + 0.5f) * tileSize, (Tile.Y + 0.5f) * tileSize);
+}
+
 public sealed class EnemySpawn
 {
     public required GridPoint Tile { get; init; }
@@ -84,6 +94,7 @@ public sealed class Room
 
     public List<Door> Doors { get; } = new();
     public List<AbilityPickup> Pickups { get; } = new();
+    public List<WeaponPickup> WeaponPickups { get; } = new();
     public List<EnemySpawn> Enemies { get; } = new();
     public List<PuzzleSwitch> Switches { get; } = new();
     public List<PressurePlate> Plates { get; } = new();

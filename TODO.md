@@ -117,9 +117,9 @@ and advanced enemies. Build iteratively, test + commit each subsystem.
 - [x] Tests for flags, door gating, switch/plate/sequence logic
 
 ## P2.5 — Expanded arsenal
-- [ ] Weapon inventory + switching; Blaster / Scatter-Shot / Plasma Blade
-- [ ] Scatter breaks cracked walls; Blade melee deflects projectiles + melee switches
-- [ ] Procedural SFX per weapon; tests for weapon logic
+- [x] Weapon inventory + switching; Blaster / Scatter-Shot / Plasma Blade
+- [x] Scatter breaks cracked walls; Blade melee deflects projectiles + melee switches
+- [x] Procedural SFX per weapon; tests for weapon logic
 
 ## P2.6 — Advanced enemies
 - [ ] Hover-Turret (predictive aim), Stalker-Drone (pathfinding chase),

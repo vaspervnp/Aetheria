@@ -35,6 +35,7 @@ public static class SaveStore
                 $"celly={data.CellY}",
                 $"deaths={data.Deaths}",
                 "abilities=" + string.Join(",", data.Abilities.Select(a => a.ToString())),
+                "weapons=" + string.Join(",", data.Weapons.Select(w => w.ToString())),
             };
             foreach (var kv in data.Flags)
                 lines.Add($"flag:{kv.Key}={kv.Value}");
@@ -70,6 +71,11 @@ public static class SaveStore
                         foreach (var tok in val.Split(',', StringSplitOptions.RemoveEmptyEntries))
                             if (Enum.TryParse<AbilityType>(tok.Trim(), out var ab) && !data.Abilities.Contains(ab))
                                 data.Abilities.Add(ab);
+                        break;
+                    case "weapons":
+                        foreach (var tok in val.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                            if (Enum.TryParse<WeaponType>(tok.Trim(), out var w) && !data.Weapons.Contains(w))
+                                data.Weapons.Add(w);
                         break;
                 }
             }

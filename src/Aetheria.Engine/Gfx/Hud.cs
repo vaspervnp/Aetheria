@@ -60,6 +60,14 @@ public static class Hud
             ax += 28;
         }
 
+        // --- current weapon ---
+        int wy = ay + 30;
+        string wpn = Arsenal.Name(player.Weapons.Current);
+        Raylib.DrawText("WPN", pad, wy + 3, 12, Palette.InkDim);
+        Raylib.DrawText(wpn.ToUpperInvariant(), pad + 34, wy, 16, Palette.Circuit);
+        if (player.Weapons.Count > 1)
+            Raylib.DrawText("[Q]", pad + 34 + Raylib.MeasureText(wpn.ToUpperInvariant(), 16) + 8, wy + 2, 12, Palette.InkDim);
+
         // --- room name (bottom centre) ---
         string name = world.Current.Name.ToUpperInvariant();
         int fs = 18;

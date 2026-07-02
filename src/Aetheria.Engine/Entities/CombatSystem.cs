@@ -1,4 +1,5 @@
 using System.Numerics;
+using Aetheria.Engine.Abilities;
 using Aetheria.Engine.Core;
 using Aetheria.Engine.World;
 
@@ -24,21 +25,36 @@ public static class CombatSystem
         float dt,
         Action<EffectKind, Vector2>? effect = null)
     {
-        // 1. Spark fires a pulse this frame.
-        if (player.WantsPulse)
-        {
-            projectiles.Add(new Projectile(
-                player.PulseOrigin, new Vector2(player.PulseDir * PulseSpeed, 0f),
-                4.5f, 0.5f, GameConfig.PulseDamage, fromPlayer: true));
-            effect?.Invoke(EffectKind.Pulse, player.PulseOrigin);
-        }
+        // 1. Spark fires the selected weapon this frame.
+        if (player.WantsFire) FireWeapon(player, projectiles, effect);
 
-        // 2. Move projectiles.
+        // 2. Move projectiles (Scatter pellets shatter cracked walls).
         foreach (var p in projectiles) p.Update(map, dt);
 
         // 3. Enemy AI / movement (can add enemy projectiles).
         foreach (var e in enemies)
             e.Update(map, player, dt, projectiles);
+
+        // 3b. Plasma Blade: damage enemies in the arc and deflect enemy shots.
+        if (player.MeleeHitbox is { } blade)
+        {
+            foreach (var e in enemies)
+            {
+                if (!e.AliveState || !blade.Intersects(e.Bounds)) continue;
+                var kb = new Vector2(player.Facing * 170f, -70f);
+                if (e.TakeDamage(GameConfig.BladeDamage, kb))
+                    effect?.Invoke(e.AliveState ? EffectKind.EnemyHit : EffectKind.EnemyDead, e.Center);
+            }
+            foreach (var proj in projectiles)
+            {
+                if (proj.Dead || proj.FromPlayer || !blade.Intersects(proj.Bounds)) continue;
+                float sp = MathF.Max(320f, proj.Velocity.Length());
+                proj.Velocity = new Vector2(player.Facing * sp, proj.Velocity.Y * 0.2f);
+                proj.FromPlayer = true;
+                proj.Damage = Math.Max(proj.Damage, 2);
+                effect?.Invoke(EffectKind.EnemyHit, proj.Position);
+            }
+        }
 
         // 4a. Spark's pulses vs enemies.
         foreach (var proj in projectiles)
@@ -90,5 +106,34 @@ public static class CombatSystem
         // 7. Cull the dead.
         projectiles.RemoveAll(p => p.Dead);
         enemies.RemoveAll(e => !e.AliveState);
+    }
+
+    private static void FireWeapon(Player player, List<Projectile> projectiles, Action<EffectKind, Vector2>? effect)
+    {
+        var o = player.FireOrigin;
+        switch (player.FireWeapon)
+        {
+            case WeaponType.Blaster:
+                projectiles.Add(new Projectile(o, new Vector2(player.FireDir * GameConfig.BlasterSpeed, 0f),
+                    4.5f, 0.5f, GameConfig.BlasterDamage, fromPlayer: true));
+                break;
+            case WeaponType.Scatter:
+            {
+                float baseAng = player.FireDir > 0 ? 0f : MathF.PI;
+                float spread = GameConfig.ScatterSpreadDeg * MathF.PI / 180f;
+                int n = GameConfig.ScatterPellets;
+                for (int i = 0; i < n; i++)
+                {
+                    float t = n == 1 ? 0.5f : i / (float)(n - 1);
+                    float ang = baseAng + (t - 0.5f) * spread;
+                    var v = new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * GameConfig.ScatterSpeed;
+                    projectiles.Add(new Projectile(o, v, 3.2f, GameConfig.ScatterLife, GameConfig.ScatterDamage, true)
+                    {
+                        BreaksWalls = true,
+                    });
+                }
+                break;
+            }
+        }
     }
 }

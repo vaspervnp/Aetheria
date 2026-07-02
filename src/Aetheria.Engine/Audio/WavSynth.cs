@@ -6,6 +6,7 @@ public enum Sfx
 {
     Jump, DoubleJump, Dash, Land, Pulse, EnemyHit, EnemyDead,
     Pickup, Unlock, Hurt, Death, Transition, Victory,
+    Scatter, Blade,
 }
 
 public enum Waveform { Sine, Square, Saw, Triangle, Noise }
@@ -41,6 +42,10 @@ public static class WavSynth
                             Tone(0.5f, 0, 0, Waveform.Noise, 0.16f, seed: 14)),
         Sfx.Transition=> Tone(0.3f, 220, 520, Waveform.Sine, 0.26f, seed: 15),
         Sfx.Victory   => Arpeggio(new[] { 523f, 659f, 784f, 1046f, 1319f }, 0.12f, Waveform.Sine, 0.34f, seed: 16),
+        Sfx.Scatter   => Layer(
+                            Tone(0.16f, 0, 0, Waveform.Noise, 0.24f, seed: 18),
+                            Tone(0.12f, 620, 200, Waveform.Square, 0.22f, seed: 19)),
+        Sfx.Blade     => Tone(0.16f, 900, 280, Waveform.Saw, 0.30f, seed: 20),
         _             => Tone(0.1f, 440, 440, Waveform.Sine, 0.3f, seed: 17),
     };
 
