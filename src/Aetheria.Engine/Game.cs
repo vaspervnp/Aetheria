@@ -69,13 +69,19 @@ public sealed class Game : IDisposable
     /// overlays) executes without runtime errors — no display interaction needed.
     /// Returns 0 on success, 2 if the window/GL context could not be created.
     /// </summary>
-    public int RunSelfTest(int frames = 600, string? shotDir = null)
+    public int RunSelfTest(int frames = 600, string? shotDir = null, int startRoom = 0)
     {
         _hidden = shotDir == null;   // screenshot capture needs a presented framebuffer
         try { Init(); }
         catch (Exception e) { Console.WriteLine("render self-test: init failed: " + e.Message); return 2; }
 
         NewGame();
+        if (startRoom > 0)
+        {
+            _world.DebugEnter(startRoom, _player);
+            LoadRoomEntities();
+            _cam.SnapTo(_player.Center);
+        }
         _state = GameState.Playing;
         for (int i = 0; i < frames; i++)
         {

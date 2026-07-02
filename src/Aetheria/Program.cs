@@ -24,13 +24,15 @@ if (args.Contains("--rendertest"))
 {
     int frames = 600;
     string? shots = null;
+    int room = 0;
     for (int i = 0; i < args.Length - 1; i++)
     {
         if (args[i] == "--frames" && int.TryParse(args[i + 1], out var f)) frames = f;
         if (args[i] == "--shots") shots = args[i + 1];
+        if (args[i] == "--room" && int.TryParse(args[i + 1], out var r)) room = r;
     }
     using var probe = new Game(seed: 1337);
-    return probe.RunSelfTest(frames, shots);
+    return probe.RunSelfTest(frames, shots, room);
 }
 
 Console.WriteLine("Aetheria: The Bio-Mechanical Abyss — launching…");

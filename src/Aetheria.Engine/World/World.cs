@@ -93,6 +93,15 @@ public sealed class World
             ReachedCore = true;
     }
 
+    /// <summary>Debug/testing aid: jump directly to a room and place the player at its spawn.</summary>
+    public void DebugEnter(int roomId, Player player)
+    {
+        if (!_rooms.TryGetValue(roomId, out var r)) return;
+        Current = r;
+        player.PlaceAt(r.DefaultSpawn);
+        _transitionLock = 0.3f;
+    }
+
     /// <summary>Restart a fresh run: back to the start room with pickups restored.</summary>
     public void Reset()
     {
