@@ -8,7 +8,7 @@ public enum Sfx
     Pickup, Unlock, Hurt, Death, Transition, Victory,
 }
 
-public enum Wave { Sine, Square, Saw, Triangle, Noise }
+public enum Waveform { Sine, Square, Saw, Triangle, Noise }
 
 /// <summary>
 /// Synthesizes retro/synth sound effects mathematically into 16-bit PCM WAV byte
@@ -22,30 +22,30 @@ public static class WavSynth
 
     public static byte[] Generate(Sfx sfx) => sfx switch
     {
-        Sfx.Jump      => Tone(0.14f, 300, 620, Wave.Square, 0.35f, seed: 1),
-        Sfx.DoubleJump=> Tone(0.14f, 520, 900, Wave.Square, 0.32f, seed: 2),
+        Sfx.Jump      => Tone(0.14f, 300, 620, Waveform.Square, 0.35f, seed: 1),
+        Sfx.DoubleJump=> Tone(0.14f, 520, 900, Waveform.Square, 0.32f, seed: 2),
         Sfx.Dash      => Layer(
-                            Tone(0.18f, 760, 180, Wave.Saw, 0.30f, seed: 3),
-                            Tone(0.12f, 0, 0, Wave.Noise, 0.18f, seed: 4)),
-        Sfx.Land      => Tone(0.09f, 150, 70, Wave.Triangle, 0.4f, seed: 5),
-        Sfx.Pulse     => Tone(0.11f, 680, 300, Wave.Square, 0.30f, seed: 6),
-        Sfx.EnemyHit  => Tone(0.07f, 0, 0, Wave.Noise, 0.30f, seed: 7),
+                            Tone(0.18f, 760, 180, Waveform.Saw, 0.30f, seed: 3),
+                            Tone(0.12f, 0, 0, Waveform.Noise, 0.18f, seed: 4)),
+        Sfx.Land      => Tone(0.09f, 150, 70, Waveform.Triangle, 0.4f, seed: 5),
+        Sfx.Pulse     => Tone(0.11f, 680, 300, Waveform.Square, 0.30f, seed: 6),
+        Sfx.EnemyHit  => Tone(0.07f, 0, 0, Waveform.Noise, 0.30f, seed: 7),
         Sfx.EnemyDead => Layer(
-                            Tone(0.26f, 420, 60, Wave.Saw, 0.30f, seed: 8),
-                            Tone(0.2f, 0, 0, Wave.Noise, 0.22f, seed: 9)),
-        Sfx.Pickup    => Arpeggio(new[] { 660f, 990f }, 0.07f, Wave.Sine, 0.34f, seed: 10),
-        Sfx.Unlock    => Arpeggio(new[] { 440f, 660f, 880f, 1320f }, 0.10f, Wave.Sine, 0.34f, seed: 11),
-        Sfx.Hurt      => Tone(0.2f, 420, 120, Wave.Square, 0.32f, seed: 12),
+                            Tone(0.26f, 420, 60, Waveform.Saw, 0.30f, seed: 8),
+                            Tone(0.2f, 0, 0, Waveform.Noise, 0.22f, seed: 9)),
+        Sfx.Pickup    => Arpeggio(new[] { 660f, 990f }, 0.07f, Waveform.Sine, 0.34f, seed: 10),
+        Sfx.Unlock    => Arpeggio(new[] { 440f, 660f, 880f, 1320f }, 0.10f, Waveform.Sine, 0.34f, seed: 11),
+        Sfx.Hurt      => Tone(0.2f, 420, 120, Waveform.Square, 0.32f, seed: 12),
         Sfx.Death     => Layer(
-                            Tone(0.6f, 320, 50, Wave.Saw, 0.34f, seed: 13),
-                            Tone(0.5f, 0, 0, Wave.Noise, 0.16f, seed: 14)),
-        Sfx.Transition=> Tone(0.3f, 220, 520, Wave.Sine, 0.26f, seed: 15),
-        Sfx.Victory   => Arpeggio(new[] { 523f, 659f, 784f, 1046f, 1319f }, 0.12f, Wave.Sine, 0.34f, seed: 16),
-        _             => Tone(0.1f, 440, 440, Wave.Sine, 0.3f, seed: 17),
+                            Tone(0.6f, 320, 50, Waveform.Saw, 0.34f, seed: 13),
+                            Tone(0.5f, 0, 0, Waveform.Noise, 0.16f, seed: 14)),
+        Sfx.Transition=> Tone(0.3f, 220, 520, Waveform.Sine, 0.26f, seed: 15),
+        Sfx.Victory   => Arpeggio(new[] { 523f, 659f, 784f, 1046f, 1319f }, 0.12f, Waveform.Sine, 0.34f, seed: 16),
+        _             => Tone(0.1f, 440, 440, Waveform.Sine, 0.3f, seed: 17),
     };
 
     /// <summary>A single tone with a linear pitch glide start→end and exp decay.</summary>
-    public static byte[] Tone(float seconds, float freqStart, float freqEnd, Wave shape, float amp, int seed)
+    public static byte[] Tone(float seconds, float freqStart, float freqEnd, Waveform shape, float amp, int seed)
     {
         int n = Math.Max(1, (int)(seconds * SampleRate));
         var samples = new float[n];
@@ -64,7 +64,7 @@ public static class WavSynth
     }
 
     /// <summary>A rising sequence of equal-length notes.</summary>
-    public static byte[] Arpeggio(float[] freqs, float noteSeconds, Wave shape, float amp, int seed)
+    public static byte[] Arpeggio(float[] freqs, float noteSeconds, Waveform shape, float amp, int seed)
     {
         int noteN = Math.Max(1, (int)(noteSeconds * SampleRate));
         var samples = new float[noteN * freqs.Length];
@@ -99,18 +99,18 @@ public static class WavSynth
         return Encode(mix);
     }
 
-    private static float Sample(Wave shape, double phase, Rng rng)
+    private static float Sample(Waveform shape, double phase, Rng rng)
     {
         double p = phase % (2.0 * Math.PI);
         if (p < 0) p += 2.0 * Math.PI;
         double norm = p / (2.0 * Math.PI); // 0..1
         return shape switch
         {
-            Wave.Sine => (float)Math.Sin(phase),
-            Wave.Square => norm < 0.5 ? 1f : -1f,
-            Wave.Saw => (float)(2.0 * norm - 1.0),
-            Wave.Triangle => (float)(4.0 * Math.Abs(norm - 0.5) - 1.0),
-            Wave.Noise => rng.NextFloat() * 2f - 1f,
+            Waveform.Sine => (float)Math.Sin(phase),
+            Waveform.Square => norm < 0.5 ? 1f : -1f,
+            Waveform.Saw => (float)(2.0 * norm - 1.0),
+            Waveform.Triangle => (float)(4.0 * Math.Abs(norm - 0.5) - 1.0),
+            Waveform.Noise => rng.NextFloat() * 2f - 1f,
             _ => 0f,
         };
     }

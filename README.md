@@ -74,15 +74,20 @@ dotnet run --project src/Aetheria -- --smoke   # head-less simulation self-test
 
 ## Controls
 
-| Action             | Keys                    |
-|--------------------|-------------------------|
-| Move               | `A` / `D` or `←` / `→`  |
-| Jump / Double Jump | `Space` / `W` / `↑`     |
-| Dash               | `L-Shift` / `K`         |
-| Pulse attack       | `J` / `X`               |
-| Phase (hold)       | `L-Ctrl` / `F`          |
-| Pause              | `P` / `Esc`             |
-| Restart (on death) | `R`                     |
+| Action                    | Keys                    |
+|---------------------------|-------------------------|
+| Move                      | `A` / `D` or `←` / `→`  |
+| Jump / Double Jump        | `Space` / `Z`           |
+| Up / Wall-climb (hold)    | `W` / `↑` (into a wall) |
+| Down / drop through       | `S` / `↓`               |
+| Dash                      | `L-Shift` / `K`         |
+| Pulse attack              | `J` / `X`               |
+| Phase (hold)              | `L-Ctrl` / `F`          |
+| Pause                     | `P` / `Esc`             |
+| Restart / confirm         | `R` / `Enter`           |
+
+Jump is a dedicated key (`Space`/`Z`) kept separate from Up (`W`/`↑`) so
+wall-climbing — which holds Up against a wall — never triggers a wall-jump.
 
 ## Story
 

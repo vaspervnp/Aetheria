@@ -43,11 +43,11 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [x] xUnit: AI stays in bounds, damage/health resolution
 
 ## Milestone 5 — Procedural rendering
-- [ ] `Palette` + `TextureFactory` (player glow, enemies, tiles, particles)
-- [ ] Parallax procedural background (noise nebula + drifting motes)
-- [ ] `FollowCamera` clamped to room bounds, smoothing, screen-shake
-- [ ] Particle system (dash trail, impacts, ambient motes)
-- [ ] HUD (health, energy, ability icons, room name)
+- [x] `Palette` + `TextureFactory` (player glow, enemies, tiles, particles)
+- [x] Parallax procedural background (noise nebula + drifting motes)
+- [x] `FollowCamera` clamped to room bounds, smoothing, screen-shake
+- [x] Particle system (dash trail, impacts, ambient motes)
+- [x] HUD (health, energy, ability icons, room name)
 
 ## Milestone 6 — Audio
 - [x] `WavSynth` — procedural 16-bit PCM WAV (jump/dash/land/hit/pickup/…)
@@ -55,11 +55,11 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [x] xUnit: WAV header validity + sample counts
 
 ## Milestone 7 — Game loop & polish
-- [ ] `Game` state machine (Title, Playing, Paused, GameOver, Victory)
-- [ ] `RaylibInput` real input source
-- [ ] `--smoke` head-less simulation harness (N frames, scripted input)
-- [ ] Title / victory / death screens, transitions, screen flash
-- [ ] Final integration build + full `dotnet test` green
+- [x] `Game` state machine (Title, Playing, Paused, GameOver, Victory)
+- [x] `RaylibInput` real input source
+- [x] `--smoke` head-less simulation harness (N frames, scripted input)
+- [x] Title / victory / death screens, transitions, screen flash
+- [x] Final integration build + full `dotnet test` green
 
 ## Backlog / possible future polish
 - [ ] Save/load of unlocked abilities & last room
