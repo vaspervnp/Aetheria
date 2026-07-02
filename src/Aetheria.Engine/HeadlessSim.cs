@@ -1,3 +1,4 @@
+using System.Numerics;
 using Aetheria.Engine.Abilities;
 using Aetheria.Engine.Core;
 using Aetheria.Engine.Entities;
@@ -42,11 +43,13 @@ public static class HeadlessSim
             player.Respawn(world.StartSpawn);
 
             List<Enemy> enemies = SpawnEnemies(world.Current);
+            List<PushBlock> blocks = SpawnBlocks(world.Current);
             var projectiles = new List<Projectile>();
 
             world.RoomChanged += (_, next) =>
             {
                 enemies = SpawnEnemies(next);
+                blocks = SpawnBlocks(next);
                 projectiles.Clear();
             };
             world.AbilityUnlocked += _ => { };
@@ -58,6 +61,8 @@ public static class HeadlessSim
                 var input = Steer(world, player, i);
                 player.Update(input, world.Current.Map, Dt);
                 CombatSystem.Step(player, enemies, projectiles, world.Current.Map, Dt);
+                PuzzleSystem.Step(world.Current, player, input, projectiles, blocks, world.Flags,
+                    player.MeleeHitbox, world.Current.Map, Dt);
                 world.Update(Dt, player);
                 visited.Add(world.CurrentCell);
 
@@ -86,6 +91,15 @@ public static class HeadlessSim
     {
         var list = new List<Enemy>();
         foreach (var s in room.Enemies) list.Add(Enemy.FromSpawn(s, room.Map.TileSize));
+        return list;
+    }
+
+    private static List<PushBlock> SpawnBlocks(Room room)
+    {
+        int ts = room.Map.TileSize;
+        var list = new List<PushBlock>();
+        foreach (var b in room.BlockSpawns)
+            list.Add(new PushBlock(new Vector2((b.X + 0.5f) * ts, (b.Y + 0.5f) * ts)));
         return list;
     }
 

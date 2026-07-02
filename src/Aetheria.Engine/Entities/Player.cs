@@ -52,6 +52,9 @@ public sealed class Player : Entity
     public Vector2 PulseOrigin { get; private set; }
     public int PulseDir { get; private set; } = 1;
 
+    /// <summary>Active melee (Plasma Blade) hitbox this frame, or null. Set in P2.5.</summary>
+    public Aabb? MeleeHitbox { get; internal set; }
+
     // ---- internal timers ----------------------------------------------------
     private float _coyote;
     private float _jumpBuffer;
@@ -94,6 +97,14 @@ public sealed class Player : Entity
 
     public void Heal(int amount) => Health = Math.Min(MaxHealth, Health + amount);
     public void RefillEnergy() => Energy = GameConfig.MaxEnergy;
+
+    /// <summary>Externally mark the player grounded (e.g. standing on a push block).</summary>
+    public void MarkGrounded()
+    {
+        OnGround = true;
+        _coyote = GameConfig.CoyoteTime;
+        _hasDoubleJumped = false;
+    }
 
     public void Update(InputState input, TileMap map, float dt)
     {

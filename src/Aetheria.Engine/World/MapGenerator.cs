@@ -116,6 +116,10 @@ public static class MapGenerator
             rooms[b].Doors.Add(new Door { Edge = Doorways.Opposite(dir), Kind = kind, Requires = req });
         }
 
+        // ---- 4b. puzzles (self-contained: an in-room switch/plate/sequence
+        //          opens a Blast door, so global connectivity is preserved) ----
+        PlacePuzzles(rooms, cells, start, core, new Rng(seed ^ 0x5EED));
+
         // ---- 5. ability pickups (gate each region) -------------------------
         PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.DoubleJump, Biome.RustVents, start, core, rng);
         PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.Dash, Biome.CrystalConduits, start, core, rng);
@@ -164,6 +168,81 @@ public static class MapGenerator
                 rooms[c].Doors.Add(new Door { Edge = Doorways.Opposite(dirFromCenter) });
             }
         return new World(rooms.Values, center);
+    }
+
+    private static void PlacePuzzles(Dictionary<GridPoint, Room> rooms, List<GridPoint> cells,
+                                     GridPoint start, GridPoint core, Rng rng)
+    {
+        var candidates = cells.Where(c => c != start && c != core
+                && rooms[c].Doors.Count >= 2
+                && rooms[c].Doors.Count(d => d.Kind == DoorKind.Open) >= 1).ToList();
+        Shuffle(candidates, rng);
+
+        int placed = 0, typeIdx = 0;
+        foreach (var c in candidates)
+        {
+            if (placed >= 6) break;
+            var room = rooms[c];
+            var open = room.Doors.Where(d => d.Kind == DoorKind.Open).ToList();
+            if (open.Count == 0) continue;
+            var door = open[rng.Range(0, open.Count)];
+            var (dx, dy) = Doorways.Delta(door.Edge);
+            var nCell = new GridPoint(c.X + dx, c.Y + dy);
+            if (!rooms.TryGetValue(nCell, out var nb)) continue;
+            var nbDoor = nb.DoorOn(Doorways.Opposite(door.Edge));
+            if (nbDoor is null || nbDoor.Kind != DoorKind.Open) continue;
+
+            string flag = $"gate_{c.X}_{c.Y}_{(int)door.Edge}";
+            ReplaceDoor(room, door, flag);
+            ReplaceDoor(nb, nbDoor, flag);
+
+            bool south = room.HasDoor(Direction.South);
+            switch (typeIdx % 3)
+            {
+                case 0:
+                    room.Switches.Add(new PuzzleSwitch
+                    {
+                        Tile = new GridPoint(RoomInterior.SafeFloorColumn(rng, south), Floor - 2),
+                        Kind = SwitchKind.Shootable, Flag = flag,
+                    });
+                    break;
+                case 1:
+                    int plateCol = RoomInterior.SafeFloorColumn(rng, south);
+                    int blockCol = Math.Clamp(plateCol + rng.Range(-8, 9), 5, Doorways.RoomW - 6);
+                    if (Math.Abs(blockCol - plateCol) < 3) blockCol = Math.Min(Doorways.RoomW - 6, plateCol + 4);
+                    room.Plates.Add(new PressurePlate { Tile = new GridPoint(plateCol, Floor - 1), Flag = flag });
+                    room.BlockSpawns.Add(new GridPoint(blockCol, Floor - 3));
+                    break;
+                default:
+                    room.Sequence = new SequencePuzzle { Flag = flag, Count = 3, TimeLimit = 6f };
+                    var order = new List<int> { 0, 1, 2 };
+                    Shuffle(order, rng);
+                    for (int i = 0; i < 3; i++)
+                        room.Switches.Add(new PuzzleSwitch
+                        {
+                            Tile = new GridPoint(8 + i * 8, Floor - 2),
+                            Kind = SwitchKind.Shootable, SequenceIndex = order[i],
+                        });
+                    break;
+            }
+            typeIdx++;
+            placed++;
+        }
+    }
+
+    private static void ReplaceDoor(Room room, Door old, string flag)
+    {
+        room.Doors.Remove(old);
+        room.Doors.Add(new Door { Edge = old.Edge, Kind = DoorKind.Blast, Flag = flag });
+    }
+
+    private static void Shuffle<T>(IList<T> list, Rng rng)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = rng.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
     }
 
     // ---- helpers -----------------------------------------------------------

@@ -110,11 +110,11 @@ and advanced enemies. Build iteratively, test + commit each subsystem.
       Conduits / Mainframe), selected by current room's biome
 
 ## P2.4 — Global state, locked doors & puzzles
-- [ ] `GameFlags` dictionary (persisted); events on change
-- [ ] Locked doors: Red Energy, Heavy Blast (flag-gated, block transition until open)
-- [ ] Switches (shootable / melee), pressure plates + pushable heavy blocks
-- [ ] Sequence puzzle (hit N switches in order within a time limit)
-- [ ] Tests for flags, door gating, switch/plate/sequence logic
+- [x] `GameFlags` dictionary (persisted); events on change
+- [x] Locked doors: Red Energy, Heavy Blast (flag-gated, block transition until open)
+- [x] Switches (shootable / melee), pressure plates + pushable heavy blocks
+- [x] Sequence puzzle (hit N switches in order within a time limit)
+- [x] Tests for flags, door gating, switch/plate/sequence logic
 
 ## P2.5 — Expanded arsenal
 - [ ] Weapon inventory + switching; Blaster / Scatter-Shot / Plasma Blade

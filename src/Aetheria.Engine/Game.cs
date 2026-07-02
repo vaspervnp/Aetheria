@@ -36,6 +36,7 @@ public sealed class Game : IDisposable
     private Player _player = null!;
     private List<Enemy> _enemies = new();
     private List<Projectile> _projectiles = new();
+    private List<PushBlock> _blocks = new();
 
     private GameState _state = GameState.Title;
     private float _time;
@@ -202,6 +203,9 @@ public sealed class Game : IDisposable
         foreach (var s in _world.Current.Enemies)
             _enemies.Add(Enemy.FromSpawn(s, TS));
         _projectiles = new List<Projectile>();
+        _blocks = new List<PushBlock>();
+        foreach (var bs in _world.Current.BlockSpawns)
+            _blocks.Add(new PushBlock(new Vector2((bs.X + 0.5f) * TS, (bs.Y + 0.5f) * TS)));
         _bossSpawned = _enemies.Exists(e => e.Kind == EnemyKind.Warden);
         _wardenWasAlive = _bossSpawned;
     }
@@ -279,6 +283,8 @@ public sealed class Game : IDisposable
         var map = _world.Current.Map;
         _player.Update(input, map, dt);
         CombatSystem.Step(_player, _enemies, _projectiles, map, dt, OnEffect);
+        PuzzleSystem.Step(_world.Current, _player, input, _projectiles, _blocks, _world.Flags,
+            _player.MeleeHitbox, map, dt, OnPuzzleEffect);
         _world.Update(dt, _player);
 
         // boss lifecycle
@@ -381,6 +387,27 @@ public sealed class Game : IDisposable
         }
     }
 
+    private void OnPuzzleEffect(string ev, Vector2 pos)
+    {
+        switch (ev)
+        {
+            case "switch_on":
+                _audio.Play(Sfx.Pickup);
+                _particles.Burst(pos, 12, Palette.Circuit, 100f, 0.4f, 2.2f);
+                break;
+            case "sequence_solved":
+                _audio.Play(Sfx.Unlock);
+                _flash = MathF.Max(_flash, 0.4f);
+                _particles.Burst(pos, 30, Palette.Pickup, 150f, 0.8f, 3f);
+                _banner = "Sequence aligned — a seal opens";
+                _bannerTime = 2.6f;
+                break;
+            case "switch_fail":
+                _audio.Play(Sfx.Hurt);
+                break;
+        }
+    }
+
     private void EmitVictorySparkle()
     {
         if (_world.Current.CoreCenter is { } c && _fx.Chance(0.5f))
@@ -426,6 +453,7 @@ public sealed class Game : IDisposable
         var cam = _cam.ToCamera2D(_sw, _sh);
         Raylib.BeginMode2D(cam);
         DrawTiles(cam);
+        DrawPuzzles();
         DrawPickups();
         DrawCore();
         DrawEnemies();
@@ -458,6 +486,45 @@ public sealed class Game : IDisposable
                     tint = new Color(255, 255, 255, _player.Phasing ? 70 : 235);
                 Raylib.DrawTextureV(tex, pos, tint);
             }
+        }
+    }
+
+    private void DrawPuzzles()
+    {
+        var room = _world.Current;
+        // pressure plates
+        foreach (var plate in room.Plates)
+        {
+            var c = plate.WorldCenter(TS);
+            var col = plate.Pressed ? Palette.Core : Palette.Rgb(90, 100, 120);
+            Raylib.DrawRectangle((int)(plate.Tile.X * TS), (int)((plate.Tile.Y) * TS + TS * 0.55f), TS, (int)(TS * 0.45f), col);
+            if (plate.Pressed)
+            {
+                Raylib.BeginBlendMode(BlendMode.Additive);
+                Raylib.DrawCircleV(c, 10f, Raylib.Fade(Palette.Core, 0.3f));
+                Raylib.EndBlendMode();
+            }
+        }
+        // heavy blocks
+        foreach (var b in _blocks)
+        {
+            Raylib.DrawRectangleRounded(new Rectangle(b.Position.X, b.Position.Y, b.Width, b.Height), 0.18f, 4, Palette.Rgb(90, 82, 74));
+            Raylib.DrawRectangleLinesEx(new Rectangle(b.Position.X, b.Position.Y, b.Width, b.Height), 2f, Palette.Rgb(140, 128, 112));
+            foreach (var (ox, oy) in new[] { (3f, 3f), (b.Width - 4f, 3f), (3f, b.Height - 4f), (b.Width - 4f, b.Height - 4f) })
+                Raylib.DrawCircleV(new Vector2(b.Position.X + ox, b.Position.Y + oy), 1.4f, Palette.Rgb(160, 150, 130));
+        }
+        // switches
+        foreach (var sw in room.Switches)
+        {
+            var c = sw.WorldCenter(TS);
+            var on = sw.Active ? Palette.Core : (sw.Kind == SwitchKind.Melee ? Palette.Pickup : Palette.Hazard);
+            Raylib.BeginBlendMode(BlendMode.Additive);
+            Raylib.DrawCircleV(c, sw.Active ? 10f : 6f, Raylib.Fade(on, 0.35f));
+            Raylib.EndBlendMode();
+            Raylib.DrawPoly(c, 6, 5f, _time * 30f, on);
+            Raylib.DrawCircleV(c, 2f, Palette.Rgb(20, 24, 30));
+            if (sw.SequenceIndex >= 0)
+                Raylib.DrawText((sw.SequenceIndex + 1).ToString(), (int)c.X - 3, (int)c.Y - 16, 12, Palette.Ink);
         }
     }
 
