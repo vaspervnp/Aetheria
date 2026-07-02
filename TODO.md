@@ -19,13 +19,13 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [x] xUnit: RNG, noise bounds, AABB, tilemap, abilities
 
 ## Milestone 2 — Physics & player controller
-- [ ] `Entity` base (position, velocity, size, aabb)
-- [ ] `Player` (Spark): accel/friction, variable jump, gravity
-- [ ] Tile collision resolution (X then Y sweep, ground/ceiling/wall flags)
-- [ ] Coyote time + jump buffering
-- [ ] Abilities: Double Jump, Dash, Wall-slide/climb/jump, Phase
-- [ ] Health / energy, damage, invulnerability window
-- [ ] xUnit: jump apex, gravity fall, landing, dash displacement, gating
+- [x] `Entity` base (position, velocity, size, aabb)
+- [x] `Player` (Spark): accel/friction, variable jump, gravity
+- [x] Tile collision resolution (X then Y sweep, ground/ceiling/wall flags)
+- [x] Coyote time + jump buffering
+- [x] Abilities: Double Jump, Dash, Wall-slide/climb/jump, Phase
+- [x] Health / energy, damage, invulnerability window
+- [x] xUnit: jump apex, gravity fall, landing, dash displacement, gating
 
 ## Milestone 3 — World & rooms
 - [ ] `Room` (tilemap + spawns + doors + pickups + metadata)
