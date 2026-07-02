@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Aetheria.Engine/Aetheria.Engine.csproj" />
+    <Project Path="src/Aetheria/Aetheria.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Aetheria.Tests/Aetheria.Tests.csproj" />
+  </Folder>
+</Solution>
