@@ -94,19 +94,19 @@ so it scales to 60+ rooms with N/S/E/W connectivity, biomes, puzzles, an arsenal
 and advanced enemies. Build iteratively, test + commit each subsystem.
 
 ## P2.1 — Grid world foundation & 4-directional transitions
-- [ ] `Biome` enum + per-biome style/palette
-- [ ] Grid coords + `Biome` on `Room`; direction-based doors (neighbour = grid step)
-- [ ] Rewrite `World` as a grid (`(gx,gy)` → room), N/S/E/W transitions + entry placement
-- [ ] Small hand-built 4-room cross to prove all 4 transition directions + tests
+- [x] `Biome` enum + per-biome style/palette
+- [x] Grid coords + `Biome` on `Room`; direction-based doors (neighbour = grid step)
+- [x] Rewrite `World` as a grid (`(gx,gy)` → room), N/S/E/W transitions + entry placement
+- [x] Small hand-built 4-room cross to prove all 4 transition directions + tests
 
 ## P2.2 — Procedural 60+ room generator across 3 biomes
-- [ ] `MapGenerator` — connected grid of ≥60 rooms, ≥3 biomes, spanning-tree + loops
-- [ ] `RoomInterior` — guaranteed-traversable interiors for any door combination
-- [ ] `TileReachability` flood-fill; tests: room count, connectivity, biomes, every
+- [x] `MapGenerator` — connected grid of ≥60 rooms, ≥3 biomes, spanning-tree + loops
+- [x] `RoomInterior` — guaranteed-traversable interiors for any door combination
+- [x] `TileReachability` flood-fill; tests: room count, connectivity, biomes, every
       door reachable, start→boss reachable
 
 ## P2.3 — Biome rendering
-- [ ] `TextureFactory` per-biome tilesets + backgrounds (Rust Vents / Crystal
+- [x] `TextureFactory` per-biome tilesets + backgrounds (Rust Vents / Crystal
       Conduits / Mainframe), selected by current room's biome
 
 ## P2.4 — Global state, locked doors & puzzles

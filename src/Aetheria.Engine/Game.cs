@@ -415,9 +415,10 @@ public sealed class Game : IDisposable
 
     private void DrawBackground()
     {
-        var src = new Rectangle(0, 0, _tex.Background.Width, _tex.Background.Height);
+        var bg = _tex.Background(_world.Current.Biome);
+        var src = new Rectangle(0, 0, bg.Width, bg.Height);
         var dst = new Rectangle(0, 0, _sw, _sh);
-        Raylib.DrawTexturePro(_tex.Background, src, dst, Vector2.Zero, 0f, Color.White);
+        Raylib.DrawTexturePro(bg, src, dst, Vector2.Zero, 0f, Color.White);
     }
 
     private void DrawWorld()
@@ -450,7 +451,7 @@ public sealed class Game : IDisposable
                 var t = map.Get(x, y);
                 if (t == TileType.Empty) continue;
                 int variant = (x * 31 + y * 17) & 0x7fffffff;
-                var tex = _tex.Tile(t, variant);
+                var tex = _tex.Tile(_world.Current.Biome, t, variant);
                 var pos = new Vector2(x * TS, y * TS);
                 Color tint = Color.White;
                 if (t == TileType.Phase)
