@@ -61,6 +61,18 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [x] Title / victory / death screens, transitions, screen flash
 - [x] Final integration build + full `dotnet test` green
 
+## Verification — done
+- [x] **82 xUnit tests green** (core, physics, world, combat, audio, smoke, gates)
+- [x] **Winnability proven twice**: the conservative reachability model gates the
+      whole progression, AND every one of the 4 ability gates is beaten by the
+      *real* `Player` physics under scripted input (`GateTraversalTests`)
+- [x] **Head-less smoke** (`--smoke`): full sim runs thousands of frames across
+      seeds with zero crashes
+- [x] **Render self-test** (`--rendertest`): boots a hidden window and runs the
+      entire Raylib draw path + every overlay without error; `--shots` captures
+      PNGs; `--room N` warps for per-room visual checks
+- [x] Debug + Release builds clean; visually verified every room + all overlays
+
 ## Backlog / possible future polish
 - [ ] Save/load of unlocked abilities & last room
 - [ ] Minimap overlay
