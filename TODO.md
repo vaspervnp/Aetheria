@@ -37,10 +37,10 @@ either the xUnit suite or the `--smoke` head-less simulation.
       world transition wiring, reachability of the Core
 
 ## Milestone 4 — Enemies & combat
-- [ ] `Enemy` base + patroller / flyer / guardian AI
-- [ ] Pulse attack + dash damage, projectiles
-- [ ] Contact damage to player, enemy death, hazards
-- [ ] xUnit: AI stays in bounds, damage/health resolution
+- [x] `Enemy` base + patroller / flyer / guardian AI
+- [x] Pulse attack + dash damage, projectiles
+- [x] Contact damage to player, enemy death, hazards
+- [x] xUnit: AI stays in bounds, damage/health resolution
 
 ## Milestone 5 — Procedural rendering
 - [ ] `Palette` + `TextureFactory` (player glow, enemies, tiles, particles)
