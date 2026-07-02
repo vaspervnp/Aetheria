@@ -5,41 +5,47 @@ using Aetheria.Engine.Entities;
 namespace Aetheria.Engine.World;
 
 /// <summary>
-/// The runtime graph of rooms. Owns which room is active, moves the player
-/// between rooms through door trigger zones, hands out ability pickups, and
-/// reports when the Core is reached.
+/// The runtime grid of rooms. Rooms live at integer cells; a door on an edge
+/// leads to the grid neighbour in that direction. Owns the active room, N/S/E/W
+/// transitions with correct entry placement, locked-door barriers driven by
+/// <see cref="Flags"/>, ability pickups, visited tracking, and the Core check.
 /// </summary>
 public sealed class World
 {
-    private readonly Dictionary<int, Room> _rooms;
-    private readonly int _startRoomId;
+    private readonly Dictionary<GridPoint, Room> _rooms;
+    private readonly GridPoint _startCell;
     private float _transitionLock;
 
     public Room Current { get; private set; }
-    public int CurrentRoomId => Current.Id;
-    public IReadOnlyDictionary<int, Room> Rooms => _rooms;
+    public GridPoint CurrentCell => Current.Cell;
+    public IReadOnlyDictionary<GridPoint, Room> Rooms => _rooms;
+    public GameFlags Flags { get; } = new();
 
-    /// <summary>Fired (old, new) when the active room changes.</summary>
     public event Action<Room, Room>? RoomChanged;
-    /// <summary>Fired when an ability pickup is collected.</summary>
     public event Action<AbilityType>? AbilityUnlocked;
 
     public bool JustTransitioned { get; private set; }
     public bool ReachedCore { get; private set; }
 
-    private readonly HashSet<int> _visited = new();
-    /// <summary>Ids of rooms Spark has entered this run (drives the minimap).</summary>
-    public IReadOnlyCollection<int> Visited => _visited;
+    private readonly HashSet<GridPoint> _visited = new();
+    public IReadOnlyCollection<GridPoint> Visited => _visited;
 
-    public World(IEnumerable<Room> rooms, int startRoomId)
+    public World(IEnumerable<Room> rooms, GridPoint startCell)
     {
-        _rooms = rooms.ToDictionary(r => r.Id);
-        _startRoomId = startRoomId;
-        Current = _rooms[startRoomId];
-        _visited.Add(startRoomId);
+        _rooms = rooms.ToDictionary(r => r.Cell);
+        _startCell = startCell;
+        Current = _rooms[startCell];
+        _visited.Add(startCell);
     }
 
-    public Vector2 StartSpawn => _rooms[_startRoomId].DefaultSpawn;
+    public Vector2 StartSpawn => _rooms[_startCell].DefaultSpawn;
+    public GridPoint StartCell => _startCell;
+
+    public Room? Neighbour(Room room, Direction edge)
+    {
+        var (dx, dy) = Doorways.Delta(edge);
+        return _rooms.TryGetValue(new GridPoint(room.GridX + dx, room.GridY + dy), out var n) ? n : null;
+    }
 
     /// <summary>Per-frame world logic: run AFTER the player has moved this frame.</summary>
     public void Update(float dt, Player player)
@@ -47,9 +53,21 @@ public sealed class World
         JustTransitioned = false;
         if (_transitionLock > 0) _transitionLock -= dt;
 
+        RefreshDoors(Current, player.Abilities);   // keep locked-door barriers in sync with flags
         TryTransition(player);
         CollectPickups(player);
         CheckCore(player);
+    }
+
+    /// <summary>Fill each locked door's opening with its barrier tile; clear opened ones.</summary>
+    public void RefreshDoors(Room room, AbilitySet abilities)
+    {
+        foreach (var door in room.Doors)
+        {
+            var tile = door.IsLocked(Flags, abilities) ? door.BarrierTile : TileType.Empty;
+            foreach (var (x, y) in Doorways.OpeningTiles(door.Edge))
+                room.Map.Set(x, y, tile);
+        }
     }
 
     private bool TryTransition(Player player)
@@ -57,21 +75,23 @@ public sealed class World
         if (_transitionLock > 0) return false;
         foreach (var door in Current.Doors)
         {
-            if (!player.Bounds.Intersects(door.TriggerZone)) continue;
-            EnterRoom(door.TargetRoomId, door.TargetEdge, player);
+            if (door.IsLocked(Flags, player.Abilities)) continue;   // barrier blocks it anyway
+            if (!player.Bounds.Intersects(Doorways.TriggerZone(door.Edge))) continue;
+            var neighbour = Neighbour(Current, door.Edge);
+            if (neighbour == null) continue;
+            EnterCell(neighbour, Doorways.Opposite(door.Edge), player);
             return true;
         }
         return false;
     }
 
-    private void EnterRoom(int roomId, Direction viaEdge, Player player)
+    private void EnterCell(Room next, Direction arriveEdge, Player player)
     {
-        if (!_rooms.TryGetValue(roomId, out var next)) return;
         var old = Current;
         Current = next;
-        _visited.Add(next.Id);
-        var entry = next.DoorOn(viaEdge);
-        player.PlaceAt(entry?.EntrySpawn ?? next.DefaultSpawn);
+        _visited.Add(next.Cell);
+        RefreshDoors(next, player.Abilities);
+        player.PlaceAt(Doorways.EntryPosition(arriveEdge));
         _transitionLock = 0.3f;
         JustTransitioned = true;
         RoomChanged?.Invoke(old, next);
@@ -99,27 +119,32 @@ public sealed class World
             ReachedCore = true;
     }
 
-    /// <summary>Debug/testing aid: jump directly to a room and place the player at its spawn.</summary>
-    public void DebugEnter(int roomId, Player player)
+    /// <summary>Debug/testing aid: jump directly to a cell and place the player at its spawn.</summary>
+    public void DebugEnter(GridPoint cell, Player player)
     {
-        if (!_rooms.TryGetValue(roomId, out var r)) return;
+        if (!_rooms.TryGetValue(cell, out var r)) return;
         Current = r;
-        _visited.Add(roomId);
+        _visited.Add(cell);
+        RefreshDoors(r, player.Abilities);
         player.PlaceAt(r.DefaultSpawn);
         _transitionLock = 0.3f;
     }
 
-    /// <summary>Restart a fresh run: back to the start room with pickups restored.</summary>
     public void Reset()
     {
-        Current = _rooms[_startRoomId];
+        Current = _rooms[_startCell];
         _transitionLock = 0f;
         ReachedCore = false;
         JustTransitioned = false;
+        Flags.Clear();
         _visited.Clear();
-        _visited.Add(_startRoomId);
+        _visited.Add(_startCell);
         foreach (var room in _rooms.Values)
-            foreach (var p in room.Pickups)
-                p.Taken = false;
+        {
+            foreach (var p in room.Pickups) p.Taken = false;
+            foreach (var s in room.Switches) s.Active = false;
+            foreach (var pl in room.Plates) pl.Pressed = false;
+            room.Sequence?.Reset();
+        }
     }
 }

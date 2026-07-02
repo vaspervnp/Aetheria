@@ -1,51 +1,61 @@
 using Raylib_cs;
+using Aetheria.Engine.World;
 
 namespace Aetheria.Engine.Gfx;
 
 /// <summary>
-/// A compact overview of the (linear) room chain in the top-right corner:
-/// visited rooms lit, the current room highlighted, the Core flagged, and
-/// unvisited rooms shown only faintly.
+/// A 2D grid minimap in the top-right corner. Shows the rooms Spark has visited,
+/// laid out by their grid cell, biome-coloured, connected by their doors, with
+/// the current room highlighted and the Core flagged.
 /// </summary>
 public static class Minimap
 {
+    private const int Cell = 9, Gap = 3, Step = Cell + Gap;
+    private const int HalfCols = 6, HalfRows = 4;   // visible radius around the current room
+
     public static void Draw(World.World world, int screenW, int screenH)
     {
-        int count = world.Rooms.Count;
-        const int node = 16, gap = 10, h = 16;
-        int totalW = count * node + (count - 1) * gap;
-        int x0 = screenW - totalW - 20;
-        int y0 = 20;
+        int panelW = (HalfCols * 2 + 1) * Step + Gap;
+        int panelH = (HalfRows * 2 + 1) * Step + Gap;
+        int px = screenW - panelW - 16, py = 16;
+        Raylib.DrawRectangleRounded(new Rectangle(px, py, panelW, panelH), 0.12f, 6, Palette.Panel);
 
-        // backing panel
-        Raylib.DrawRectangleRounded(
-            new Rectangle(x0 - 10, y0 - 10, totalW + 20, h + 20), 0.3f, 6, Palette.Panel);
+        var cur = world.CurrentCell;
+        int cx = px + panelW / 2, cy = py + panelH / 2;
 
-        for (int i = 0; i < count; i++)
+        foreach (var cell in world.Visited)
         {
-            if (!world.Rooms.TryGetValue(i, out var room)) continue;
-            int x = x0 + i * (node + gap);
-            var box = new Rectangle(x, y0, node, h);
+            int gx = cell.X - cur.X, gy = cell.Y - cur.Y;
+            if (Math.Abs(gx) > HalfCols || Math.Abs(gy) > HalfRows) continue;
+            if (!world.Rooms.TryGetValue(cell, out var room)) continue;
 
-            if (i > 0) // connector
-                Raylib.DrawLineEx(new System.Numerics.Vector2(x - gap, y0 + h / 2f),
-                    new System.Numerics.Vector2(x, y0 + h / 2f), 2f, Palette.InkDim);
+            int rx = cx + gx * Step - Cell / 2;
+            int ry = cy + gy * Step - Cell / 2;
+            bool current = cell.Equals(cur);
+            var col = current ? Palette.Spark : BiomeColor(room.Biome);
+            Raylib.DrawRectangle(rx, ry, Cell, Cell, col);
+            if (room.IsCore) Raylib.DrawRectangle(rx + 2, ry + 2, Cell - 4, Cell - 4, Palette.CoreGlow);
+            if (current) Raylib.DrawRectangleLinesEx(new Rectangle(rx - 1, ry - 1, Cell + 2, Cell + 2), 1.5f, Palette.SparkCore);
 
-            bool visited = world.Visited.Contains(i);
-            bool current = i == world.CurrentRoomId;
-            Color fill = current ? Palette.Spark
-                       : room.IsCore ? Palette.Core
-                       : visited ? Palette.Rgb(60, 90, 120)
-                       : Palette.Rgb(30, 38, 52);
-
-            if (visited || current)
-                Raylib.DrawRectangleRounded(box, 0.3f, 4, fill);
-            Raylib.DrawRectangleLinesEx(box, current ? 2f : 1f,
-                current ? Palette.SparkCore : (visited ? Palette.InkDim : Palette.Rgb(50, 60, 76)));
-
-            if (room.IsCore)
-                Raylib.DrawCircle(x + node / 2, y0 + h / 2, 3f,
-                    visited ? Palette.CoreGlow : Palette.Rgb(60, 100, 88));
+            // door connectors to visited neighbours
+            foreach (Direction d in Enum.GetValues<Direction>())
+            {
+                if (!room.HasDoor(d)) continue;
+                var (dx, dy) = Doorways.Delta(d);
+                var n = new GridPoint(cell.X + dx, cell.Y + dy);
+                if (!world.Visited.Contains(n)) continue;
+                int mxp = rx + Cell / 2 + dx * (Cell / 2 + Gap / 2);
+                int myp = ry + Cell / 2 + dy * (Cell / 2 + Gap / 2);
+                Raylib.DrawRectangle(mxp - 1, myp - 1, 2, 2, Palette.InkDim);
+            }
         }
     }
+
+    public static Color BiomeColor(Biome b) => b switch
+    {
+        Biome.RustVents => Palette.Rgb(150, 84, 54),
+        Biome.CrystalConduits => Palette.Rgb(70, 150, 150),
+        Biome.Mainframe => Palette.Rgb(90, 110, 160),
+        _ => Palette.Rgb(90, 100, 120),
+    };
 }

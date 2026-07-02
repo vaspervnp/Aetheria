@@ -10,6 +10,9 @@ public enum TileType : byte
     Phase = 2,       // solid unless the player is phasing
     Hazard = 3,      // non-solid but damages on contact
     OneWay = 4,      // solid only from above (jump-through platform)
+    Cracked = 5,     // solid, but shattered by the Scatter-Shot
+    DoorRed = 6,     // solid locked door (Red Energy) until its flag is set
+    DoorBlast = 7,   // solid heavy blast door until its flag is set
 }
 
 /// <summary>
@@ -85,6 +88,9 @@ public sealed class TileMap
         return t switch
         {
             TileType.Solid => true,
+            TileType.Cracked => true,
+            TileType.DoorRed => true,
+            TileType.DoorBlast => true,
             TileType.Phase => !phasing,
             TileType.OneWay => false, // handled specially by the resolver
             _ => false,

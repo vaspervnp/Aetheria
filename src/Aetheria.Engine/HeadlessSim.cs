@@ -34,10 +34,10 @@ public static class HeadlessSim
     public static SmokeResult Run(int frames = 4000, uint seed = 1337)
     {
         var result = new SmokeResult();
-        var visited = new HashSet<int>();
+        var visited = new HashSet<GridPoint>();
         try
         {
-            var world = WorldBuilder.Build(seed);
+            var world = MapGenerator.Generate(seed);
             var player = new Player(world.StartSpawn);
             player.Respawn(world.StartSpawn);
 
@@ -51,15 +51,15 @@ public static class HeadlessSim
             };
             world.AbilityUnlocked += _ => { };
 
-            visited.Add(world.CurrentRoomId);
+            visited.Add(world.CurrentCell);
 
             for (int i = 0; i < frames; i++)
             {
-                var input = Script(i);
+                var input = Steer(world, player, i);
                 player.Update(input, world.Current.Map, Dt);
                 CombatSystem.Step(player, enemies, projectiles, world.Current.Map, Dt);
                 world.Update(Dt, player);
-                visited.Add(world.CurrentRoomId);
+                visited.Add(world.CurrentCell);
 
                 if (!player.Alive)
                 {
@@ -89,20 +89,46 @@ public static class HeadlessSim
         return list;
     }
 
-    /// <summary>A rough "keep moving right, jump/dash/attack/phase" bot.</summary>
-    private static InputState Script(int i)
+    /// <summary>A door-seeking bot: steers toward an unlocked door and crosses it.</summary>
+    private static InputState Steer(World.World world, Player p, int frame)
     {
-        int j = i % 45;
-        bool jumpPressed = j == 0;
-        bool jumpHeld = j < 11;
-        bool jumpReleased = j == 11;
-        bool dash = (i % 80) == 20;
-        bool attack = (i % 40) == 5;
-        bool phase = (i % 240) is >= 120 and < 190;   // hold phase for a stretch
-        bool up = (i % 120) >= 60;                      // sometimes hold up (climb)
+        var room = world.Current;
+        int ts = room.Map.TileSize;
+
+        Door? target = null;
+        foreach (var pref in new[] { Direction.East, Direction.West, Direction.South, Direction.North })
+        {
+            target = room.Doors.FirstOrDefault(d => d.Edge == pref && !d.IsLocked(world.Flags, p.Abilities));
+            if (target != null) break;
+        }
+
+        float mx = 1f;
+        bool up = false, wantJump = false;
+        if (target != null)
+        {
+            switch (target.Edge)
+            {
+                case Direction.East: mx = 1f; break;
+                case Direction.West: mx = -1f; break;
+                case Direction.South:
+                    float sx = (Doorways.NsDoorCol + 1) * ts;
+                    mx = p.Center.X < sx - 4 ? 1f : p.Center.X > sx + 4 ? -1f : 0f;
+                    break;
+                case Direction.North:
+                    float nx = Doorways.NorthClimbCol * ts;
+                    mx = p.Center.X < nx - 4 ? 1f : p.Center.X > nx + 4 ? -1f : 0f;
+                    up = true; wantJump = true;
+                    break;
+            }
+        }
+
+        bool wall = (mx > 0 && p.OnWallRight) || (mx < 0 && p.OnWallLeft);
+        int j = frame % 40;
         return new InputState(
-            moveX: 1f, up: up, down: false,
-            jumpPressed: jumpPressed, jumpHeld: jumpHeld, jumpReleased: jumpReleased,
-            dashPressed: dash, attackPressed: attack, phaseHeld: phase);
+            moveX: mx, up: up,
+            jumpPressed: wall || wantJump || j == 0,
+            jumpHeld: wantJump || j < 12,
+            jumpReleased: j == 12,
+            dashPressed: frame % 90 == 30, attackPressed: frame % 40 == 5);
     }
 }

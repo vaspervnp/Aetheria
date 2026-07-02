@@ -28,13 +28,16 @@ public static class SaveStore
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var lines = new[]
+            var lines = new List<string>
             {
-                "version=1",
-                $"room={data.RoomId}",
+                "version=2",
+                $"cellx={data.CellX}",
+                $"celly={data.CellY}",
                 $"deaths={data.Deaths}",
                 "abilities=" + string.Join(",", data.Abilities.Select(a => a.ToString())),
             };
+            foreach (var kv in data.Flags)
+                lines.Add($"flag:{kv.Key}={kv.Value}");
             File.WriteAllLines(path, lines);
         }
         catch { /* saving must never crash the game */ }
@@ -53,9 +56,15 @@ public static class SaveStore
                 if (eq <= 0) continue;
                 string key = raw[..eq].Trim();
                 string val = raw[(eq + 1)..].Trim();
+                if (key.StartsWith("flag:"))
+                {
+                    if (int.TryParse(val, out var fv)) data.Flags[key[5..]] = fv;
+                    continue;
+                }
                 switch (key)
                 {
-                    case "room": int.TryParse(val, out var r); data.RoomId = r; break;
+                    case "cellx": int.TryParse(val, out var cx); data.CellX = cx; break;
+                    case "celly": int.TryParse(val, out var cy); data.CellY = cy; break;
                     case "deaths": int.TryParse(val, out var d); data.Deaths = d; break;
                     case "abilities":
                         foreach (var tok in val.Split(',', StringSplitOptions.RemoveEmptyEntries))

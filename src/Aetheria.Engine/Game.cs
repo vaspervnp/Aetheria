@@ -85,7 +85,8 @@ public sealed class Game : IDisposable
         NewGame();
         if (startRoom > 0)
         {
-            _world.DebugEnter(startRoom, _player);
+            var cell = _world.Rooms.Keys.OrderBy(k => (k.Y, k.X)).ElementAt(Math.Min(startRoom, _world.Rooms.Count - 1));
+            _world.DebugEnter(cell, _player);
             LoadRoomEntities();
             _cam.SnapTo(_player.Center);
         }
@@ -155,7 +156,7 @@ public sealed class Game : IDisposable
 
     private void BuildRun()
     {
-        _world = WorldBuilder.Build(_seed);
+        _world = MapGenerator.Generate(_seed);
         _world.RoomChanged += OnRoomChanged;
         _world.AbilityUnlocked += OnAbilityUnlocked;
         _player = new Player(_world.StartSpawn);
