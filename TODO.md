@@ -50,9 +50,9 @@ either the xUnit suite or the `--smoke` head-less simulation.
 - [ ] HUD (health, energy, ability icons, room name)
 
 ## Milestone 6 — Audio
-- [ ] `WavSynth` — procedural 16-bit PCM WAV (jump/dash/land/hit/pickup/…)
-- [ ] `AudioManager` — load from memory, play, volume
-- [ ] xUnit: WAV header validity + sample counts
+- [x] `WavSynth` — procedural 16-bit PCM WAV (jump/dash/land/hit/pickup/…)
+- [x] `AudioManager` — load from memory, play, volume
+- [x] xUnit: WAV header validity + sample counts
 
 ## Milestone 7 — Game loop & polish
 - [ ] `Game` state machine (Title, Playing, Paused, GameOver, Victory)
