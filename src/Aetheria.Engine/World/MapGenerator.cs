@@ -18,6 +18,20 @@ public static class MapGenerator
 
     public static World Generate(uint seed = 20240601u, int targetRooms = TargetRooms)
     {
+        // Only ever return a world that WorldSolver proves is completable. Almost
+        // always succeeds on the first attempt; retries use deterministic seeds.
+        World? last = null;
+        for (int attempt = 0; attempt < 32; attempt++)
+        {
+            uint s = unchecked(seed + (uint)attempt * 2654435761u);
+            last = GenerateOnce(s, targetRooms);
+            if (WorldSolver.Solve(last).Beatable) return last;
+        }
+        return last!;
+    }
+
+    private static World GenerateOnce(uint seed, int targetRooms)
+    {
         var rng = new Rng(seed);
         var start = new GridPoint(0, 0);
 
@@ -116,19 +130,21 @@ public static class MapGenerator
             rooms[b].Doors.Add(new Door { Edge = Doorways.Opposite(dir), Kind = kind, Requires = req });
         }
 
-        // ---- 4b. puzzles (self-contained: an in-room switch/plate/sequence
-        //          opens a Blast door, so global connectivity is preserved) ----
-        PlacePuzzles(rooms, cells, start, core, new Rng(seed ^ 0x5EED));
+        // ---- 5. ability pickups, placed where they are actually reachable
+        //         with the abilities the player holds on arrival --------------
+        var none = new HashSet<AbilityType>();
+        var afterDj = new HashSet<AbilityType> { AbilityType.DoubleJump };
+        var afterDash = new HashSet<AbilityType> { AbilityType.DoubleJump, AbilityType.Dash };
+        PlaceAbilityReachable(rooms, start, none, BiomeAt, AbilityType.DoubleJump, Biome.RustVents, core, rng);
+        PlaceAbilityReachable(rooms, start, afterDj, BiomeAt, AbilityType.Dash, Biome.CrystalConduits, core, rng);
+        PlaceAbilityReachable(rooms, start, afterDash, BiomeAt, AbilityType.Phase, Biome.Mainframe, core, rng);
+        PlaceAbilityReachable(rooms, start, afterDash, BiomeAt, AbilityType.WallClimb, Biome.Mainframe, core, rng);
 
-        // ---- 5. ability pickups (gate each region) -------------------------
-        PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.DoubleJump, Biome.RustVents, start, core, rng);
-        PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.Dash, Biome.CrystalConduits, start, core, rng);
-        PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.Phase, Biome.Mainframe, start, core, rng);
-        PlaceAbility(rooms, cells, dist, BiomeAt, AbilityType.WallClimb, Biome.Mainframe, start, core, rng);
+        // ---- 5b. weapons (also reachability-placed; not required to finish) --
+        PlaceWeaponReachable(rooms, start, afterDj, BiomeAt, WeaponType.Scatter, Biome.CrystalConduits, core, rng);
+        PlaceWeaponReachable(rooms, start, afterDash, BiomeAt, WeaponType.Blade, Biome.Mainframe, core, rng);
 
-        // weapons + destructible cracked walls
-        PlaceWeapon(rooms, cells, BiomeAt, WeaponType.Scatter, Biome.CrystalConduits, start, core, rng);
-        PlaceWeapon(rooms, cells, BiomeAt, WeaponType.Blade, Biome.Mainframe, start, core, rng);
+        // ---- 5c. destructible cracked walls (decorative / optional) ---------
         foreach (var c in cells)
         {
             if (c == start || c == core) continue;
@@ -140,6 +156,10 @@ public static class MapGenerator
                 rooms[c].Map.Set(col, Floor - 2, TileType.Cracked);
             }
         }
+
+        // ---- 5d. puzzles gate ONLY optional dead-end rooms, with the switch on
+        //          the reachable side — so they never block progression --------
+        PlacePuzzles(rooms, start, core, new Rng(seed ^ 0x5EED));
 
         // ---- 6. enemies ----------------------------------------------------
         foreach (var c in cells)
@@ -185,63 +205,76 @@ public static class MapGenerator
         return new World(rooms.Values, center);
     }
 
-    private static void PlacePuzzles(Dictionary<GridPoint, Room> rooms, List<GridPoint> cells,
-                                     GridPoint start, GridPoint core, Rng rng)
+    private static void PlacePuzzles(Dictionary<GridPoint, Room> rooms, GridPoint start, GridPoint core, Rng rng)
     {
-        var candidates = cells.Where(c => c != start && c != core
-                && rooms[c].Doors.Count >= 2
-                && rooms[c].Doors.Count(d => d.Kind == DoorKind.Open) >= 1).ToList();
-        Shuffle(candidates, rng);
+        var order = rooms.Keys.ToList();
+        Shuffle(order, rng);
 
         int placed = 0, typeIdx = 0;
-        foreach (var c in candidates)
+        foreach (var c in order)
         {
             if (placed >= 6) break;
+            if (c == start || c == core) continue;
             var room = rooms[c];
-            var open = room.Doors.Where(d => d.Kind == DoorKind.Open).ToList();
-            if (open.Count == 0) continue;
-            var door = open[rng.Range(0, open.Count)];
-            var (dx, dy) = Doorways.Delta(door.Edge);
-            var nCell = new GridPoint(c.X + dx, c.Y + dy);
-            if (!rooms.TryGetValue(nCell, out var nb)) continue;
-            var nbDoor = nb.DoorOn(Doorways.Opposite(door.Edge));
-            if (nbDoor is null || nbDoor.Kind != DoorKind.Open) continue;
 
-            string flag = $"gate_{c.X}_{c.Y}_{(int)door.Edge}";
-            ReplaceDoor(room, door, flag);
-            ReplaceDoor(nb, nbDoor, flag);
-
-            bool south = room.HasDoor(Direction.South);
-            switch (typeIdx % 3)
+            // Find an Open door to a genuine dead-end (its only door), so gating it
+            // can never fragment the map, and its switch lives on the reachable side.
+            Door? chosen = null;
+            GridPoint nbCell = default;
+            foreach (var d in room.Doors)
             {
-                case 0:
-                    room.Switches.Add(new PuzzleSwitch
-                    {
-                        Tile = new GridPoint(RoomInterior.SafeFloorColumn(rng, south), Floor - 2),
-                        Kind = SwitchKind.Shootable, Flag = flag,
-                    });
-                    break;
-                case 1:
-                    int plateCol = RoomInterior.SafeFloorColumn(rng, south);
-                    int blockCol = Math.Clamp(plateCol + rng.Range(-8, 9), 5, Doorways.RoomW - 6);
-                    if (Math.Abs(blockCol - plateCol) < 3) blockCol = Math.Min(Doorways.RoomW - 6, plateCol + 4);
-                    room.Plates.Add(new PressurePlate { Tile = new GridPoint(plateCol, Floor - 1), Flag = flag });
-                    room.BlockSpawns.Add(new GridPoint(blockCol, Floor - 3));
-                    break;
-                default:
-                    room.Sequence = new SequencePuzzle { Flag = flag, Count = 3, TimeLimit = 6f };
-                    var order = new List<int> { 0, 1, 2 };
-                    Shuffle(order, rng);
-                    for (int i = 0; i < 3; i++)
-                        room.Switches.Add(new PuzzleSwitch
-                        {
-                            Tile = new GridPoint(8 + i * 8, Floor - 2),
-                            Kind = SwitchKind.Shootable, SequenceIndex = order[i],
-                        });
-                    break;
+                if (d.Kind != DoorKind.Open) continue;
+                var (dx, dy) = Doorways.Delta(d.Edge);
+                var nc = new GridPoint(c.X + dx, c.Y + dy);
+                if (nc == core || !rooms.TryGetValue(nc, out var nb)) continue;
+                if (nb.Doors.Count != 1) continue;                       // must be a dead-end
+                if (nb.Pickups.Count > 0 || nb.WeaponPickups.Count > 0) continue;
+                chosen = d; nbCell = nc; break;
             }
+            if (chosen is null) continue;
+
+            var deadEnd = rooms[nbCell];
+            string flag = $"gate_{c.X}_{c.Y}_{(int)chosen.Edge}";
+            ReplaceDoor(room, chosen, flag);
+            var back = deadEnd.DoorOn(Doorways.Opposite(chosen.Edge));
+            if (back != null) ReplaceDoor(deadEnd, back, flag);
+
+            AddMechanism(room, flag, typeIdx, rng);
             typeIdx++;
             placed++;
+        }
+    }
+
+    private static void AddMechanism(Room room, string flag, int typeIdx, Rng rng)
+    {
+        bool south = room.HasDoor(Direction.South);
+        switch (typeIdx % 3)
+        {
+            case 0:
+                room.Switches.Add(new PuzzleSwitch
+                {
+                    Tile = new GridPoint(RoomInterior.SafeFloorColumn(rng, south), Floor - 2),
+                    Kind = SwitchKind.Shootable, Flag = flag,
+                });
+                break;
+            case 1:
+                int plateCol = RoomInterior.SafeFloorColumn(rng, south);
+                int blockCol = Math.Clamp(plateCol + rng.Range(-8, 9), 5, Doorways.RoomW - 6);
+                if (Math.Abs(blockCol - plateCol) < 3) blockCol = Math.Min(Doorways.RoomW - 6, plateCol + 4);
+                room.Plates.Add(new PressurePlate { Tile = new GridPoint(plateCol, Floor - 1), Flag = flag });
+                room.BlockSpawns.Add(new GridPoint(blockCol, Floor - 3));
+                break;
+            default:
+                room.Sequence = new SequencePuzzle { Flag = flag, Count = 3, TimeLimit = 6f };
+                var order = new List<int> { 0, 1, 2 };
+                Shuffle(order, rng);
+                for (int i = 0; i < 3; i++)
+                    room.Switches.Add(new PuzzleSwitch
+                    {
+                        Tile = new GridPoint(8 + i * 8, Floor - 2),
+                        Kind = SwitchKind.Shootable, SequenceIndex = order[i],
+                    });
+                break;
         }
     }
 
@@ -274,26 +307,50 @@ public static class MapGenerator
         };
     }
 
-    private static void PlaceAbility(
-        Dictionary<GridPoint, Room> rooms, List<GridPoint> cells, Dictionary<GridPoint, int> dist,
-        Func<GridPoint, Biome> biomeAt, AbilityType ability, Biome biome, GridPoint start, GridPoint core, Rng rng)
+    /// <summary>Rooms reachable from start using Open doors + AbilityGates the player can pass with <paramref name="have"/>.</summary>
+    private static HashSet<GridPoint> OpenReach(Dictionary<GridPoint, Room> rooms, GridPoint start, HashSet<AbilityType> have)
     {
-        var candidates = cells.Where(c => biomeAt(c) == biome && c != start && c != core
-                                          && !rooms[c].Pickups.Any()).ToList();
-        if (candidates.Count == 0) candidates = cells.Where(c => biomeAt(c) == biome && c != core).ToList();
-        if (candidates.Count == 0) return;
-        var cell = candidates[rng.Range(0, candidates.Count)];
+        var seen = new HashSet<GridPoint> { start };
+        bool grew = true;
+        while (grew)
+        {
+            grew = false;
+            foreach (var c in seen.ToList())
+                foreach (var d in rooms[c].Doors)
+                {
+                    bool pass = d.Kind == DoorKind.Open
+                              || (d.Kind == DoorKind.AbilityGate && d.Requires is { } a && have.Contains(a));
+                    if (!pass) continue;
+                    var (dx, dy) = Doorways.Delta(d.Edge);
+                    var n = new GridPoint(c.X + dx, c.Y + dy);
+                    if (rooms.ContainsKey(n) && seen.Add(n)) grew = true;
+                }
+        }
+        return seen;
+    }
+
+    private static void PlaceAbilityReachable(
+        Dictionary<GridPoint, Room> rooms, GridPoint start, HashSet<AbilityType> have,
+        Func<GridPoint, Biome> biomeAt, AbilityType ability, Biome biome, GridPoint core, Rng rng)
+    {
+        var reach = OpenReach(rooms, start, have);
+        bool Empty(GridPoint c) => rooms[c].Pickups.Count == 0 && rooms[c].WeaponPickups.Count == 0;
+        var cands = reach.Where(c => c != start && c != core && Empty(c) && biomeAt(c) == biome).ToList();
+        if (cands.Count == 0) cands = reach.Where(c => c != start && c != core && Empty(c)).ToList();
+        if (cands.Count == 0) return;
+        var cell = cands[rng.Range(0, cands.Count)];
         int col = RoomInterior.SafeFloorColumn(rng, rooms[cell].HasDoor(Direction.South));
         rooms[cell].Pickups.Add(new AbilityPickup { Tile = new GridPoint(col, Floor - 2), Type = ability });
     }
 
-    private static void PlaceWeapon(
-        Dictionary<GridPoint, Room> rooms, List<GridPoint> cells, Func<GridPoint, Biome> biomeAt,
-        WeaponType weapon, Biome biome, GridPoint start, GridPoint core, Rng rng)
+    private static void PlaceWeaponReachable(
+        Dictionary<GridPoint, Room> rooms, GridPoint start, HashSet<AbilityType> have,
+        Func<GridPoint, Biome> biomeAt, WeaponType weapon, Biome biome, GridPoint core, Rng rng)
     {
-        var candidates = cells.Where(c => biomeAt(c) == biome && c != start && c != core
-                                          && !rooms[c].Pickups.Any() && !rooms[c].WeaponPickups.Any()).ToList();
-        if (candidates.Count == 0) candidates = cells.Where(c => biomeAt(c) == biome && c != core).ToList();
+        var reach = OpenReach(rooms, start, have);
+        bool Empty(GridPoint c) => rooms[c].Pickups.Count == 0 && rooms[c].WeaponPickups.Count == 0;
+        var candidates = reach.Where(c => c != start && c != core && Empty(c) && biomeAt(c) == biome).ToList();
+        if (candidates.Count == 0) candidates = reach.Where(c => c != start && c != core && Empty(c)).ToList();
         if (candidates.Count == 0) return;
         var cell = candidates[rng.Range(0, candidates.Count)];
         int col = RoomInterior.SafeFloorColumn(rng, rooms[cell].HasDoor(Direction.South));

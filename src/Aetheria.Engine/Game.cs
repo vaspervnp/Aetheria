@@ -43,6 +43,8 @@ public sealed class Game : IDisposable
     private float _flash;
     private float _bannerTime;
     private string _banner = "";
+    private float _hintTime;
+    private string _hint = "";
     private float _endTime;
     private int _deaths;
     private bool _hidden;
@@ -247,6 +249,7 @@ public sealed class Game : IDisposable
     {
         if (_flash > 0f) _flash = MathF.Max(0f, _flash - dt * 1.6f);
         if (_bannerTime > 0f) _bannerTime -= dt;
+        if (_hintTime > 0f) _hintTime -= dt;
 
         switch (_state)
         {
@@ -298,6 +301,8 @@ public sealed class Game : IDisposable
             _player.MeleeHitbox, map, dt, OnPuzzleEffect);
         _world.Update(dt, _player);
 
+        CheckDoorHint();
+
         // boss lifecycle
         bool wardenAlive = _enemies.Exists(e => e.Kind == EnemyKind.Warden);
         if (_bossSpawned && _wardenWasAlive && !wardenAlive) OnBossDefeated();
@@ -347,6 +352,38 @@ public sealed class Game : IDisposable
             if (_persist) SaveStore.Delete();   // run complete
             _hasSave = false;
         }
+    }
+
+    private void CheckDoorHint()
+    {
+        foreach (var door in _world.Current.Doors)
+        {
+            if (!door.IsLocked(_world.Flags, _player.Abilities)) continue;
+            if (!_player.Bounds.Intersects(Doorways.TriggerZone(door.Edge))) continue;
+            _hint = door.Kind == DoorKind.AbilityGate && door.Requires is { } a
+                ? $"SEALED — needs {AbilitySet.DisplayName(a)}"
+                : "SEALED — power the switch in this chamber";
+            _hintTime = 0.2f;
+            return;
+        }
+    }
+
+    /// <summary>Grid direction to the nearest uncollected ability (for the compass), if any.</summary>
+    private (Vector2 dir, AbilityType type)? NearestObjective()
+    {
+        var cur = _world.CurrentCell;
+        int best = int.MaxValue;
+        GridPoint bestCell = default;
+        AbilityType type = default;
+        foreach (var room in _world.Rooms.Values)
+            foreach (var pk in room.Pickups)
+                if (!pk.Taken)
+                {
+                    int d = Math.Abs(room.GridX - cur.X) + Math.Abs(room.GridY - cur.Y);
+                    if (d < best) { best = d; bestCell = room.Cell; type = pk.Type; }
+                }
+        if (best == int.MaxValue) return null;
+        return (new Vector2(bestCell.X - cur.X, bestCell.Y - cur.Y), type);
     }
 
     private void OnBossDefeated()
@@ -460,6 +497,8 @@ public sealed class Game : IDisposable
             Hud.Draw(_player, _world, _sw, _sh);
             if (_showMap) Minimap.Draw(_world, _sw, _sh);
             DrawBossBar();
+            DrawObjectiveCompass();
+            DrawHint();
         }
 
         if (_flash > 0f)
@@ -841,6 +880,37 @@ public sealed class Game : IDisposable
         }
         const string label = "THE WARDEN";
         Raylib.DrawText(label, (_sw - Raylib.MeasureText(label, 14)) / 2, y - 18, 14, Palette.Ink);
+    }
+
+    private void DrawHint()
+    {
+        if (_hintTime <= 0f) return;
+        int fs = 18;
+        int w = Raylib.MeasureText(_hint, fs);
+        int x = (_sw - w) / 2, y = _sh - 62;
+        Raylib.DrawRectangle(x - 12, y - 6, w + 24, fs + 12, Raylib.Fade(Palette.Panel, 0.9f));
+        Raylib.DrawText(_hint, x, y, fs, Palette.Hazard);
+    }
+
+    private void DrawObjectiveCompass()
+    {
+        if (NearestObjective() is not { } obj) return;
+        var (dir, type) = obj;
+        int cx = _sw / 2, cy = 40;
+        string label = "OBJECTIVE: " + AbilitySet.DisplayName(type);
+        if (dir == Vector2.Zero)
+        {
+            label = AbilitySet.DisplayName(type) + " — in this room";
+        }
+        else
+        {
+            var d = Vector2.Normalize(dir);
+            float ang = MathF.Atan2(d.Y, d.X) * 180f / MathF.PI;
+            var tip = new Vector2(cx, cy);
+            Raylib.DrawPoly(tip, 3, 9f, ang, Palette.Pickup);
+        }
+        int w = Raylib.MeasureText(label, 12);
+        Raylib.DrawText(label, cx - w / 2, cy + 12, 12, Palette.InkDim);
     }
 
     private void DrawBanner()

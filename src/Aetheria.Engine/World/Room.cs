@@ -37,9 +37,9 @@ public sealed class Door
 
     public TileType BarrierTile => Kind switch
     {
-        DoorKind.RedEnergy => TileType.DoorRed,
         DoorKind.Blast => TileType.DoorBlast,
-        _ => TileType.Solid,
+        DoorKind.Open => TileType.Solid,
+        _ => TileType.DoorRed,   // RedEnergy + AbilityGate render as a visible energy seal
     };
 }
 
