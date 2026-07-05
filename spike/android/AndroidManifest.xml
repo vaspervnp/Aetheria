@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  EXPERIMENTAL / UNTESTED — see README.md.
+  Uses NativeActivity so the OS loads a native lib directly. The android.app.lib_name
+  value must match the native module NativeAOT produces; wiring the app glue to call
+  the exported `aetheria_android_main` (AndroidSpike.cs) is the open question.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.aetheria.spike">
+  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
+  <application android:label="Aetheria spike" android:hasCode="false">
+    <activity android:name="android.app.NativeActivity"
+              android:label="Aetheria spike"
+              android:screenOrientation="landscape"
+              android:configChanges="orientation|keyboardHidden|screenSize"
+              android:exported="true">
+      <!-- Points the OS at the native lib to load. Adjust to the produced .so name. -->
+      <meta-data android:name="android.app.lib_name" android:value="Aetheria.Android.Spike" />
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

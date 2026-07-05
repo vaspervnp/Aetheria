@@ -1,0 +1,48 @@
+<!--
+  EXPERIMENTAL / UNTESTED — see README.md.
+  Option A spike: NativeAOT-compiled C# that statically links libraylib.a
+  (built by build-raylib-android.sh) so the NativeAOT module supplies the entry
+  symbol rcore_android.c expects. This has never been verified; the DirectPInvoke
+  / NativeLibrary / linker-flag set below is a starting point to iterate on.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>29</SupportedOSPlatformVersion>
+    <OutputType>Library</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- NativeAOT: needed so a native entry symbol exists for Raylib to link against. -->
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+
+    <!-- Resolve [DllImport("raylib")] against the statically-linked archive. -->
+    <DirectPInvoke Include="raylib" />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The C# P/Invoke bindings only (we bring our own native lib). -->
+    <PackageReference Include="Raylib-cs" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Static Raylib produced by build-raylib-android.sh. -->
+    <NativeLibrary Include="libs/android-arm64/libraylib.a" Condition="Exists('libs/android-arm64/libraylib.a')" />
+    <!-- Also accept the raw ABI folder name the build script writes. -->
+    <NativeLibrary Include="libs/arm64-v8a/libraylib.a" Condition="Exists('libs/arm64-v8a/libraylib.a')" />
+  </ItemGroup>
+
+  <!-- Android system libs Raylib's GL/audio/activity code needs at link time.
+       Add/remove as unresolved-symbol errors appear during the spike. -->
+  <ItemGroup>
+    <LinkerArg Include="-llog" />
+    <LinkerArg Include="-landroid" />
+    <LinkerArg Include="-lEGL" />
+    <LinkerArg Include="-lGLESv2" />
+    <LinkerArg Include="-lOpenSLES" />
+    <LinkerArg Include="-lm" />
+  </ItemGroup>
+
+</Project>
