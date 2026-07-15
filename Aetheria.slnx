@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/docs/">
+    <File Path="docs/AETHERIA-CPC6128-SPEC.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Aetheria.Engine/Aetheria.Engine.csproj" />
     <Project Path="src/Aetheria/Aetheria.csproj" />
