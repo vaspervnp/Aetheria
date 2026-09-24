@@ -21,6 +21,20 @@ algorithms, and reach the Core to reignite the planet.
 
 ---
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Title menu](docs/screenshots/menu.png) | ![The Rust Vents](docs/screenshots/gameplay-rust-vents.png) |
+| **Title screen** — *You are Spark. Reignite the Core.* | **The Rust Vents** — the starting biome |
+| ![The Crystal Conduits](docs/screenshots/gameplay-crystal-conduits.png) | ![The Mainframe](docs/screenshots/gameplay-mainframe.png) |
+| **The Crystal Conduits** — mid-depth crystal | **The Mainframe** — the deepest biome, near the Core |
+
+More in [docs/screenshots](docs/screenshots/README.md). Every frame is drawn
+procedurally — captured with the game's own `--rendertest --shots` self-test.
+
+---
+
 ## Features
 
 - **Procedural graphics** — the player, enemies, tiles, particles and parallax
