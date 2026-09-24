@@ -5,6 +5,7 @@
   <Folder Name="/src/">
     <Project Path="src/Aetheria.Engine/Aetheria.Engine.csproj" />
     <Project Path="src/Aetheria/Aetheria.csproj" />
+    <Project Path="src/Aetheria.Setup/Aetheria.Setup.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Aetheria.Tests/Aetheria.Tests.csproj" />

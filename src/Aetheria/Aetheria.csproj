@@ -9,6 +9,17 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>1.0</Version>
+    <!-- The Windows .exe carries the game's icon; the installer reuses it for shortcuts. -->
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Bundled so Aetheria.Setup can embed it for the Linux .desktop icon too. -->
+    <None Remove="Icon.ico" />
+    <EmbeddedResource Include="Icon.ico">
+      <LogicalName>Icon.ico</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
 
 </Project>
